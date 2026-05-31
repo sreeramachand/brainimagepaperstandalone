@@ -22,6 +22,8 @@
 \usepackage{subcaption}
 \usepackage{booktabs}
 \usepackage{doi}
+\usepackage{enumitem}
+\usepackage{placeins}
 
 % -----------------------------------------------------------------------------
 %     Geometry & Hyperref setup
@@ -38,7 +40,7 @@
   linkcolor=black,
   citecolor=black,
   urlcolor=black,
-  pdftitle={Mathematical Signatures of Malignancy: Forecasting Glioblastoma Multiforme By Implementing Graph Algorithms in Gene Coexpression Networks},
+  pdftitle={Graph Signal Processing of Brain Connectome Networks: Spectral Analysis and Geometric Deep Learning for Glioblastoma Prediction},
   pdfauthor={Adityakrishna SreeRamachandrarao and Anusha Lakshmi Dharmavathi and Satyavathi Dronamraju},
 }
 
@@ -66,7 +68,7 @@
 % -----------------------------------------------------------------------------
 %     Front‑matter
 % -----------------------------------------------------------------------------
-\title[A Computational Biomedical Oncology Approach to Glioblastoma Multiforme: Graph-Theoretic Signatures in Gene Coexpression Networks]{A Computational Biomedical Oncology Approach to Glioblastoma Multiforme: Graph-Theoretic Signatures in Gene Coexpression Networks}
+\title[Graph Signal Processing of Brain Connectome Networks]{Graph Signal Processing of Brain Connectome Networks: Spectral Analysis and Geometric Deep Learning for Glioblastoma Prediction}
 
 \author{
 Adityakrishna SreeRamachandrarao\textsuperscript{1} \and
@@ -75,13 +77,13 @@ Satyavathi Dronamraju\textsuperscript{3}
 }
 \address{Department of Science and Technology, Scientific Researchers LLC, Indianapolis, Indiana, USA}
 \email{\textsuperscript{1}asreera110@scientificresearchers.org \and
-\textsuperscript{2}anushadronamraju20@scientificresearchers.org \and 
+\textsuperscript{2}anushadronamraju20@scientificresearchers.org \and
 \textsuperscript{3}satyadronamraju11@scientificresearchers.org}
 
 \thanks{\noindent\textsuperscript{1}\,Corresponding author}
 
-\subjclass[2010]{05C69}
-\keywords{Gene coexpression, Pearson's Correlation Coefficient, Mann-Whitney U test}
+\subjclass[2010]{05C50, 68T07, 92C55}
+\keywords{Graph signal processing, brain connectome, graph Fourier transform, Dirichlet energy, geometric deep learning, glioblastoma multiforme, spectral biomarkers, graph wavelets}
 
 
 \begin{document}
@@ -92,7 +94,7 @@ Satyavathi Dronamraju\textsuperscript{3}
 %     Abstract
 % -----------------------------------------------------------------------------
 \begin{abstract}
-Conventional genomic analyses of cancer focus on individual high-risk mutations, yet many malignancies arise in their absence, underscoring the need for a more holistic screening paradigm. We propose graph theory as such a framework: genes are modeled as nodes, statistically significant coexpression relationships (Pearson's correlation with $p\text{-value} < 0.05$, Benjamini--Hochberg corrected) as weighted edges, and the resulting gene coexpression network encodes collective regulatory behavior invisible to single-gene methods. Using glioblastoma multiforme (GBM) and normal brain expression data from TCGA and GTEx respectively, we identify four mathematical signatures that distinguish cancer from normal networks: (i) degree distribution and power-law exponent, (ii) clique cover number and Ramsey substructure, (iii) $k$-core decomposition, and (iv) signed Laplacian eigenvalue spectrum. Each signature was tested for statistical significance via the Mann--Whitney $U$ test and bootstrapped goodness-of-fit procedures. Our results confirm significant topological differences across all four metrics, consistent with GBM manifesting as a network-level disorder rather than a collection of isolated mutations. These signatures lay the groundwork for a graph-theoretic biomarker framework applicable to early cancer detection and, prospectively, to a meta-analysis spanning multiple cancer types.
+We develop a graph signal processing (GSP) framework for analyzing atlas-based brain connectomes and training a geometric deep learning model for glioblastoma multiforme (GBM) prediction under an explicit smoothness prior. Regional MRI measurements are represented as signals over a shared 48-node Harvard--Oxford cortical atlas graph, enabling analysis in both the vertex and spectral domains. The graph Fourier transform, Dirichlet energy, spectral centroid, spectral entropy, and multiscale graph wavelets are used to characterize disease-related deviations from healthy brain organization. GBM signals are found to concentrate in lower graph frequencies with reduced spectral entropy compared to healthy cohorts, while multiscale wavelet energy distinguishes cohorts at fine and intermediate scales. A graph neural network classifier trained under a smoothness-regularized objective---combining binary cross-entropy prediction loss with a Dirichlet energy penalty on learned node embeddings---achieves perfect class separation on the reported cohort. The smoothness penalty acts as a graph diffusion operator on learned representations, suppressing graph-inconsistent variation while preserving task-relevant disease contrast. Together, the spectral analysis and regularized learning framework provide a principled, interpretable approach to connectome-aware disease prediction.
 \end{abstract}
 
 \maketitle
@@ -101,275 +103,628 @@ Conventional genomic analyses of cancer focus on individual high-risk mutations,
 %     Section 1: Introduction
 % -----------------------------------------------------------------------------
 \section{Introduction}
-Glioblastoma multiforme (GBM) is the most aggressive form of astrocytic tumor, characterized by rapid proliferation, extensive infiltration, and poor response to therapy. Despite decades of sequencing efforts, median patient survival after diagnosis remains under 15 months, and targeted single-gene therapies have achieved only modest gains \cite{jeong2001lethality}. This persistent failure highlights a fundamental limitation of reductionist approaches: cancer is not simply the consequence of one or two mutant genes, but an emergent phenomenon arising from dysregulated interactions across entire gene regulatory networks.
+\label{sec:intro}
 
-Graph theory provides a natural mathematical language for capturing such network-level phenomena. Representing genes as nodes and coexpression relationships as edges transforms a high-dimensional transcriptomic dataset into a topological object whose global properties can be analyzed with precision. Differences between healthy and malignant tissue can then be framed as differences in network topology---differences that may be quantified, tested statistically, and used as predictive signatures of malignancy.
+Brain imaging data are naturally structured: measurements are not independent across space, but are constrained by anatomy, functional relationships, and long-range organization. When regional quantities are aggregated over a cortical atlas, each brain scan may be described as a signal over a set of graph nodes, where nodes correspond to regions of interest (ROIs) and edges encode inter-regional affinity. This representation makes graph signal processing (GSP) a natural mathematical language for studying how disease perturbs spatial organization.
 
-This paper investigates whether GBM leaves reproducible mathematical signatures in gene coexpression networks and whether such signatures can be rigorously characterized using tools from graph theory and spectral analysis. We identify four such signatures, derive the mathematical foundations underpinning each, and validate their discriminatory power against GBM and normal brain expression data.
-
-% -----------------------------------------------------------------------------
-%     Section 2: Application of Graph Networks
-% -----------------------------------------------------------------------------
-\section{Application of Graph Networks}
-Mathematical and computational models are increasingly indispensable in biomedical research, where in vivo and in vitro studies face both scientific and ethical constraints. In this study, all analyses were conducted in silico using glioblastoma multiforme and normal brain gene expression data. After systematic investigation, four graph-theoretic signatures were identified as particularly informative for distinguishing cancer from normal gene coexpression networks. Each captures a distinct structural property of the network, and together they provide a multidimensional characterization of malignancy.
-
-The first signature is degree distribution and power-law exponent. We hypothesize that cancer networks exhibit scale-free behavior more pronounced than in normal networks. Scale-free networks are characterized by a power-law degree distribution \cite{barabasi1999emergence} and preferential attachment dynamics, in which highly connected hub nodes accumulate additional connections at a disproportionate rate \cite{newman2005power}. In the oncogenic context, hub regulatory genes become overexpressed, driving unchecked cellular proliferation in a positive feedback loop \cite{jeong2001lethality}. As a consequence, the power-law exponent $\gamma$ is expected to be lower in cancer networks, reflecting heavier degree tails and greater hub dominance \cite{barabasi1999emergence}.
-
-The second signature is clique cover number and Ramsey substructure. The clique cover number quantifies how many complete subgraphs are required to cover all vertices of a graph \cite{golumbic2004algorithmic}. Ramsey theory guarantees that in any sufficiently large graph, large cliques or independent sets must appear \cite{graham1990ramsey}, and furthermore that predictable dense substructures will emerge \cite{erdos1935combinatorial}. We hypothesize that cancer networks exhibit higher clique cover numbers, reflecting aberrant interconnectivity arising from metabolic rewiring and immune evasion. Integrating Ramsey theory, we further predict that the relationship between clique density and clique size will reveal a distinctive substructure in the cancer network that is absent in the normal network.
-
-The third signature is $k$-core decomposition. The $k$-core of a graph is the maximal subgraph in which every vertex has degree at least $k$, and iterative peeling reveals a hierarchical organization of central versus peripheral nodes \cite{seidman1983network,batagelj2003core}. Deep $k$-cores identify sets of genes that are densely and mutually co-regulated, which has proven informative in protein interaction networks \cite{wuchty2003evolutionary}. We hypothesize that cancer networks harbor deeper $k$-cores corresponding to tightly reinforced oncogenic modules, even as peripheral connectivity becomes more fragmented due to mutation-induced edge loss and sparse network rewiring. This produces a characteristic co-existence of a dense inner shell and a disrupted periphery that is not observed in normal networks.
-
-The fourth and final signature is the signed Laplacian eigenvalue spectrum. The signed Laplacian is constructed from the difference between the signed degree matrix and the signed adjacency matrix, and accommodates the negative-weight edges that arise from inhibitory coexpression relationships \cite{kunegis2010spectral}. The second-smallest eigenvalue, the algebraic connectivity, measures global cohesion and robustness \cite{fiedler1973algebraic}. The multiplicity of the zero eigenvalue gives the number of balanced connected components, while negative eigenvalues indicate structurally unbalanced cycles arising from antagonistic regulatory modules \cite{hou2005bounds}. Higher-order spectral moments reflect pathway redundancy \cite{chung1997spectral}. We hypothesize that cancer networks will exhibit lower algebraic connectivity, more negative eigenvalues, and a broader eigenvalue spectrum than normal networks, all consistent with the fractured, conflicting regulatory architecture of malignant tissue.
-
-Table~\ref{tab:hypotheses} summarizes the hypothesized differences between cancer and normal networks for each signature.
-
-{\Large
-\begin{table}[H]
-\centering
-\caption{Comparison of Hypothesized Graph Features}
-\label{tab:hypotheses}
-\renewcommand{\arraystretch}{1.8}
-\resizebox{\textwidth}{!}{
-\begin{tabular}{@{}llll@{}}
-\toprule
-\textbf{Metric} & \textbf{Cancer Network (Glioblastoma)} & \textbf{Normal Brain Network} \\
-\hline
-\textbf{Degree Distribution \& Power-Law} & Heavier tail; lower $\gamma$ ($\gamma \approx 2.0$--$2.5$); more hubs & Lighter tail; higher $\gamma$ ($\gamma \approx 2.5$--$3.5$); fewer hubs \\
-\hline
-\textbf{Clique Cover \& Ramsey Structure} & Higher clique cover; overlapping, conflicting communities & Lower clique cover; modular but cleaner community boundaries \\
-\hline
-\textbf{k-Core Decomposition} & Higher max coreness; deeper, tightly nested cores & Lower coreness; flatter, less nested hierarchy \\
-\hline
-\textbf{Laplacian (or Signed) Spectrum} & Spread out, with possible \textbf{negative} eigenvalues (due to dysregulation) & Tightly clustered, all positive eigenvalues; highly cohesive \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-}
-
-% -----------------------------------------------------------------------------
-%     Section 3: Materials and Methods
-% -----------------------------------------------------------------------------
-\section{Materials and Methods}
-Gene expression data were obtained from two public repositories: TCGA (The Cancer Genome Atlas) \cite{gbmcancerdata} for GBM tumor samples, and GTEx (Genotype-Tissue Expression) \cite{normalbraindata} for matched normal brain samples. This pairing enables a controlled comparative analysis between malignant and healthy transcriptomes.
-
-Network construction was performed in Python using the NetworkX library. A random subset of genes was selected from the cancer dataset, and the corresponding genes were identified in the normal dataset. After filtering lowly expressed genes and applying a $\log_2$ transformation to stabilize variance, Pearson's correlation coefficients were computed for every pairwise gene combination. A correlation was included as a network edge only if the associated $p$-value satisfied $p < 0.05$, and multiple testing was controlled using the Benjamini--Hochberg false discovery rate procedure \cite{benjaminihochberg1995}. Outlier samples were excluded prior to network construction to prevent spurious correlations. The resulting signed, weighted gene coexpression networks---one for GBM and one for normal brain---were then subjected to the four graph-theoretic analyses described below.
-
-\subsection{Degree Distribution in Networks}
-The degree of a node $i$, denoted $k_i$, is the number of edges incident on that node. The degree distribution $P(k)$ is the probability that a randomly selected node has degree exactly $k$. In many real-world networks, the tail of $P(k)$ follows a power law:
+Let
 \[
-  P(k) \sim C\,k^{-\alpha}, \quad k \ge k_{\min},
+G = (V,E,W)
 \]
-where $\alpha>1$ is the power-law exponent, $k_{\min}$ is the lower cutoff above which the power law holds, and $C$ is a normalization constant:
+denote an undirected weighted graph with node set $V=\{1,\dots,N\}$, edge set $E$, and symmetric weighted adjacency matrix $W \in \mathbb{R}^{N\times N}$, where $W_{ij} \ge 0$. For each subject $s$, an imaging-derived regional measurement is represented as a graph signal
 \[
-  C = \biggl(\sum_{k=k_{\min}}^{\infty} k^{-\alpha}\biggr)^{-1}.
+x^{(s)} \in \mathbb{R}^{N},
 \]
+whose $i$-th entry is the mean signal value in region $i$. A disease classifier maps the graph signal (and optionally graph structure) to a label
+\[
+y^{(s)} \in \{0,1\},
+\]
+with $y^{(s)}=1$ representing GBM and $y^{(s)}=0$ representing healthy tissue.
 
-\subsection{Maximum-Likelihood Estimation of \texorpdfstring{$\alpha$}{alpha}}
-Given observed degrees $\{k_i\}$ with $k_i \ge k_{\min}$ for $i=1,\dots,n$, the maximum-likelihood estimator (MLE) of $\alpha$ for discrete data is \cite{clauset2009power}:
-\[
-  \widehat{\alpha}
-  = 1 + n \biggl[ \sum_{i=1}^n \ln\!\Bigl(\frac{k_i}{k_{\min} - 0.5}\Bigr) \biggr]^{-1}.
-\]
-This estimator minimizes the negative log-likelihood
-\[
-  \mathcal{L}(\alpha) = -\,n\ln C(\alpha,k_{\min}) + \alpha \sum_{i=1}^n \ln k_i.
-\]
-The lower cutoff $k_{\min}$ is selected by minimizing the Kolmogorov--Smirnov (KS) distance between the empirical cumulative distribution function (CDF) and the fitted power-law CDF.
+The central modeling principle is that biologically meaningful graph signals often exhibit \emph{piecewise smoothness}: neighboring regions tend to have related values unless disrupted by pathology. This motivates regularizing the learned predictive representation using graph Dirichlet energy. The resulting objective balances prediction fidelity against structural smoothness:
+\begin{equation}
+\label{eq:main_objective_intro}
+\mathcal{L}_{\text{total}}
+=
+\mathcal{L}_{\text{pred}}
++
+\lambda \,\mathcal{L}_{\text{smooth}},
+\end{equation}
+where $\mathcal{L}_{\text{pred}}$ is task-specific and $\mathcal{L}_{\text{smooth}}$ is a smoothness penalty derived from graph Dirichlet energy, with regularization weight $\lambda>0$.
 
-\subsection{Goodness-of-Fit \texorpdfstring{$p$}{p}-Value via Bootstrapping}
-To test whether a power law is a plausible model for the observed degree sequence:
-\begin{enumerate}
-  \item Fit $\widehat{\alpha}$ and record the KS statistic $D_{\rm obs}$.
-  \item Generate many synthetic datasets of size $n$ drawn from a power law with exponent $\widehat{\alpha}$ and the same $k_{\min}$.
-  \item Refit each synthetic dataset to obtain its KS statistic $D_{\rm synth}$.
-  \item The $p$-value is the fraction of synthetic statistics that exceed the observed value:
-    \[
-      p = \frac{\#\{D_{\rm synth} \ge D_{\rm obs}\}}{\text{number of simulations}}.
-    \]
-  If $p>0.1$, the power-law model is considered plausible; if $p<0.1$, it is rejected.
+This paper unifies four threads:
+\begin{enumerate}[label=(\roman*)]
+    \item construction of a shared brain graph from anatomical regions,
+    \item representation of regional measurements as graph signals,
+    \item spectral and wavelet characterization of disease-related deviations, and
+    \item supervised learning with a prediction objective regularized by graph smoothness.
 \end{enumerate}
 
-\subsection{Log-Likelihood Ratio Tests}
-To compare the power-law model against an alternative heavy-tailed distribution, consider two competing probability mass functions $p_1(k)$ and $p_2(k)$. Their log-likelihoods on the observed data $\{k_i\}$ are
-\[
-  \mathcal{L}_1 = \sum_{i=1}^n \ln p_1(k_i), \quad
-  \mathcal{L}_2 = \sum_{i=1}^n \ln p_2(k_i).
-\]
-The log-likelihood ratio is
-\[
-  R = \mathcal{L}_1 - \mathcal{L}_2.
-\]
-A positive $R$ indicates support for model~1 (e.g., power law over exponential), while $R<0$ favors model~2. Statistical significance is assessed using Vuong's method \cite{Vuong1989}.
-
-\subsection{Clique Cover Number}
-For a graph $G=(V,E)$, a \emph{clique cover} is a collection of cliques $\{C_1,\dots,C_k\}$ such that every vertex $v\in V$ lies in at least one $C_i$. The \textbf{clique cover number} $\theta(G)$ is the minimum number of cliques in such a collection:
-\[
-  \theta(G)
-  = \min\bigl\{k : \exists\, C_1,\dots,C_k \text{ all cliques, } V = \textstyle\bigcup_{i=1}^k C_i \bigr\}.
-\]
-Covering $V$ by cliques in $G$ is equivalent to coloring the complement graph $\overline{G}$, so
-\[
-  \theta(G) = \chi\bigl(\overline{G}\bigr),
-\]
-where $\chi$ denotes the chromatic number. If $\omega(G)$ denotes the maximum clique size in $G$, then
-\[
-  \omega(G) \le\, \theta(G) \le\, |V|.
-\]
-
-\subsection{Ramsey Theory}
-The \emph{Ramsey number} $R(s,t)$ is the smallest integer $N$ such that every graph on $N$ vertices contains either a clique of size $s$ or an independent set of size $t$:
-\[
-  R(s,t) = \min\{N : \forall\,G\text{ on }N\text{ vertices, } \omega(G)\ge s \;\vee\; \alpha(G)\ge t\}.
-\]
-Erd\H{o}s and Szekeres proved the classical bound:
-\[
-  R(s,t) \le \binom{s+t-2}{s-1},
-  \quad\text{and in particular}\quad
-  R(s,s) \le \binom{2s-2}{s-1} \sim \frac{4^{s-1}}{\sqrt{\pi(s-1)}}.
-\]
-
-\subsection{K-core Decomposition}
-Let $G = (V,E)$ be an undirected graph. The \emph{$k$-core} of $G$ is the maximal subgraph in which every vertex has degree at least $k$:
-\[
-C_k(G)
-\;=\;
-\max \bigl\{\,H = (V_H, E_H)\subseteq G : \delta(H)\ge k\bigr\},
-\]
-where $\delta(H)$ denotes the minimum degree of subgraph $H$. Each node $v\in V$ is assigned a \emph{core number}
-\[
-\phi(v)
-\;=\;
-\max\bigl\{\,k : v\in C_k(G)\bigr\},
-\]
-which is the largest $k$ such that $v$ survives iterative pruning of all nodes with degree less than $k$.
-
-\subsection{Signed Graph and Laplacian: Theory and Definitions}
-Let $G = (V, E^+, E^-)$ be a signed graph, where $E^+$ contains positive (activating) edges and $E^-$ contains negative (inhibitory) edges. The \emph{signed adjacency matrix} $A^s \in \mathbb{R}^{n \times n}$ is defined by
-\[
-A^s_{ij}
-\;=\;
-\begin{cases}
-+1, & (i,j)\in E^+,\\[4pt]
--1, & (i,j)\in E^-,\\[4pt]
-0,  & \text{otherwise}.
-\end{cases}
-\]
-The \emph{signed degree matrix} $D^s$ is diagonal with entries
-\[
-D^s_{ii}
-\;=\;
-\sum_{j=1}^n \bigl|A^s_{ij}\bigr|,
-\]
-counting the total absolute edge weight incident on node $i$. The \emph{signed Laplacian} is
-\[
-L^s
-\;=\;
-D^s \;-\; A^s,
-\]
-which is symmetric and positive semi-definite for structurally balanced graphs. The eigenvalues of $L^s$,
-\[
-0 \;=\; \lambda_1 \;\leq\; \lambda_2 \;\leq\; \cdots \;\leq\; \lambda_n,
-\]
-encode the structural balance of the signed graph. The multiplicity of $\lambda = 0$ equals the number of balanced connected components, and the second-smallest eigenvalue $\lambda_2$ (the Fiedler value or algebraic connectivity) measures global network cohesion. The presence of negative eigenvalues in the unsigned Laplacian setting signals structurally unbalanced cycles consistent with antagonistic regulatory interactions.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The formulation is consistent across all analyses: the spectrum, graph wavelets, and smoothness measures serve both as descriptive tools and as principled regularizers in the supervised learning problem.
 
 % -----------------------------------------------------------------------------
-%     Section 4: Results and Conclusion
+%     Section 2: Construction of the Brain Connectome Graph
 % -----------------------------------------------------------------------------
-\section{Results and Conclusion}
+\section{Construction of the Brain Connectome Graph}
+\label{sec:graph_construction}
 
-\begin{figure}[htbp]
+\subsection{Network Definition}
+
+A common atlas provides a shared node set across subjects. The Harvard--Oxford cortical atlas defines $N=48$ cortical ROIs, giving a fixed graph topology for all subjects. Let the node set be
+\[
+V=\{1,\dots,48\}.
+\]
+An undirected edge $(i,j)\in E$ is included when regions $i$ and $j$ are considered anatomically or statistically connected in the shared reference graph. The graph is represented by its weighted adjacency matrix $W$, degree matrix $D$, and graph Laplacian $L$:
+\begin{align}
+W_{ij} &= W_{ji} \ge 0,\\
+D_{ii} &= \sum_{j=1}^{N} W_{ij},\\
+L &= D - W.
+\end{align}
+Because node degrees may vary, the normalized Laplacian is also useful:
+\begin{equation}
+\label{eq:normalized_laplacian}
+L_{\mathrm{sym}}
+=
+I - D^{-1/2} W D^{-1/2}.
+\end{equation}
+The normalized version permits comparison across regions with different connectivity levels and is particularly convenient for spectral analysis and graph convolutions.
+
+\subsection{Atlas and Spatial Registration}
+
+The atlas-based construction pipeline is illustrated in Figures~\ref{fig:mni_atlas} and~\ref{fig:tumor_mask_alignment}. The MNI152 template provides the common reference space, the Harvard--Oxford atlas provides ROI labels, and subject-level MRI and tumor masks are mapped into this space so that node-wise quantities can be computed consistently across the cohort.
+
+\begin{figure}[H]
     \centering
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1norm_net.png}
-        \caption{Normal Network}
-        \label{fig:graph1}
-    \end{subfigure}\hfill
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1onc_net.png}
-        \caption{Cancer Network}
-        \label{fig:graph2}
-    \end{subfigure}
-    \caption{Comparison between the normal and GBM gene coexpression networks.}
-    \label{fig:graphs}
+    \includegraphics[width=0.98\textwidth]{chapter4_assets/harvard-oxford-atlas.png}
+    \caption{Reference space and atlas definition. Left: MNI152 1\,mm template. Right: Harvard--Oxford atlas projected onto MNI space with 48 cortical regions. This atlas defines the graph nodes used throughout the analysis.}
+    \label{fig:mni_atlas}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1powerlaw_comp.png}
-        \caption{Degree Distribution and Power Law}
-    \end{subfigure}
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1cliq_comp.png}
-        \caption{Clique Cover Number and Ramsey Theory}
-    \end{subfigure}
-    \vspace{1em}
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1k_core_dist.png}
-        \caption{K-core Decomposition}
-    \end{subfigure}
-    \begin{subfigure}{0.45\textwidth}
-        \includegraphics[width=\linewidth]{trial_1_example/trial1laplacian_eigval_spec.png}
-        \caption{Laplacian Eigenvalue Spectrum}
-    \end{subfigure}
-    \caption{Four mathematical signatures of malignancy in GBM versus normal brain coexpression networks.}
-    \label{fig:fourimages}
+    \includegraphics[width=0.98\textwidth]{chapter4_assets/tumor-mask-comparison.png}
+    \caption{Registration and atlas alignment workflow. The reference image, atlas labels, and tumor mask are shown in common space, enabling atlas-wise aggregation of tumor burden and image-derived regional signals.}
+    \label{fig:tumor_mask_alignment}
 \end{figure}
 
-\subsection{Analysis, Interpretations, and Conclusions}
+After registration, each atlas node receives a region-level summary statistic, such as the mean T1 intensity or the fraction of voxels covered by tumor.
 
-We validate the four mathematical signatures of malignancy beginning with a qualitative analysis of the network figures, followed by a quantitative examination of the computed metrics.
+\subsection{Descriptive Topology of the Shared Connectome}
 
-Figure~\ref{fig:graphs} provides an immediate visual contrast between the two networks. The normal network exhibits a more balanced distribution of edge weights and a modular community structure, consistent with the organized, hierarchical gene regulation expected in healthy tissue. The cancer network, by contrast, displays markedly uneven edge weight distribution, with several hub nodes accumulating disproportionately many connections. Furthermore, the community boundaries in the cancer network are less distinct, with overlapping and conflicting modules visible across the graph. These visual observations are directly interpretable through the lens of clique cover and Ramsey theory: as cancer dysregulation compounds through positive feedback, the network is driven toward a state in which large, dense cliques inevitably emerge---consistent with the Ramsey-theoretic guarantee that sufficiently complex graphs cannot avoid large structured subgraphs \cite{graham1990ramsey,erdos1935combinatorial}. These dense cliques correspond to clusters of co-activated oncogenic pathway genes that form as metabolic rewiring and immune evasion mechanisms take hold.
+Figure~\ref{fig:connectome_descriptive_statistics} summarizes the degree distribution, clustering coefficient distribution, betweenness centrality distribution, and graph visualizations colored by several node-level attributes.
 
-\textbf{Degree distribution and power-law exponent.} Both networks exhibit degree distributions consistent with power-law behavior, confirming scale-free organization in both cases. However, the cancer network displays a heavier degree tail and a lower MLE power-law exponent $\widehat{\alpha}$, indicating a greater prevalence of high-degree hub nodes. This is consistent with the preferential attachment hypothesis: in cancer, central regulatory hubs accumulate edges preferentially as dysregulation amplifies itself in a feedback loop, driving $\gamma$ downward. Log-likelihood ratio tests confirmed that a power-law model fits the degree distributions significantly better than an exponential alternative for both networks ($p < 0.05$), with the cancer network showing a more pronounced scale-free signature. The bootstrapped goodness-of-fit $p$-value for the power-law model exceeded $0.1$ for both networks, indicating that the power-law hypothesis cannot be rejected in either case.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/connectome-by-descriptive-stat.png}
+    \caption{Descriptive graph statistics and graph visualizations for the shared 48-node connectome. Top row: distributions of degree, clustering coefficient, and betweenness centrality. Bottom row: the same graph colored by degree, average GBM tumor presence, and average healthy mean T1 signal.}
+    \label{fig:connectome_descriptive_statistics}
+\end{figure}
 
-\textbf{Clique cover number and Ramsey substructure.} The clique cover number was substantially higher in the cancer network than in the normal network. The density-versus-clique-size histogram in Figure~\ref{fig:fourimages}(b) shows that the cancer network harbors larger cliques at higher internal edge densities, while the normal network's clique size distribution is more uniform and the maximum clique size is smaller. This is consistent with the Ramsey-theoretic prediction: the cancer network, driven to aberrant complexity by oncogenic dysregulation, produces large dense subgraphs reflecting co-activated gene modules. A Mann--Whitney $U$ test on clique size distributions between the two networks confirmed a statistically significant difference ($p < 0.05$), validating this signature.
+If $d_i$ is the degree of node $i$, the average degree is
+\begin{equation}
+\bar d = \frac{1}{N}\sum_{i=1}^{N} d_i.
+\end{equation}
+The local clustering coefficient of node $i$ is
+\begin{equation}
+C_i = \frac{2T_i}{d_i(d_i-1)},
+\end{equation}
+where $T_i$ is the number of triangles through node $i$. Betweenness centrality quantifies how frequently a node lies on shortest paths:
+\begin{equation}
+B_i = \sum_{\substack{s\neq i\neq t\\ s<t}} \frac{\sigma_{st}(i)}{\sigma_{st}},
+\end{equation}
+where $\sigma_{st}$ is the number of shortest paths from $s$ to $t$ and $\sigma_{st}(i)$ counts those passing through $i$. These graph properties matter because a smoothness penalty of the form $f^\top L f$ penalizes differences across edges; nodes with many strong incident edges contribute more strongly to the total regularization.
 
-\textbf{K-core decomposition.} The cancer network exhibited a higher maximum coreness value and a deeper nested core hierarchy than the normal network, as visible in Figure~\ref{fig:fourimages}(c). The deeper $k$-cores in the cancer network correspond to tightly co-regulated oncogenic hub modules that reinforce each other's expression. Crucially, this deep inner core co-exists with a more fragmented periphery: peripheral gene interactions are disrupted by mutations and sparse rewiring, while the central oncogenic circuitry becomes increasingly entrenched. The normal network, by contrast, displays a flatter coreness profile consistent with distributed, balanced regulatory control rather than a dominant central module. A Mann--Whitney $U$ test on the maximum coreness values confirmed a statistically significant difference between the two conditions ($p < 0.05$).
+% -----------------------------------------------------------------------------
+%     Section 3: Brain Measurements as Graph Signals
+% -----------------------------------------------------------------------------
+\section{Brain Measurements as Graph Signals}
+\label{sec:signals}
 
-\textbf{Laplacian eigenvalue spectrum.} The signed Laplacian spectrum of the cancer network was markedly more spread out than that of the normal network, as shown in Figure~\ref{fig:fourimages}(d). Most strikingly, the cancer network exhibited negative eigenvalues absent in the normal network. As established theoretically, negative eigenvalues in the signed Laplacian arise from structurally unbalanced cycles---configurations in which a set of genes simultaneously activates and inhibits the same downstream target through distinct regulatory paths. This antagonistic co-regulation is a hallmark of the conflicting signaling environment in malignant tissue. The algebraic connectivity $\lambda_2$ was substantially lower in the cancer network, indicating weaker global cohesion and greater susceptibility to network fragmentation. The normal network's spectrum remained tightly clustered around positive values, reflecting high structural balance and cohesive organization. A Mann--Whitney $U$ test on algebraic connectivity values confirmed that the cancer network has significantly lower $\lambda_2$ ($p < 0.05$).
+\subsection{Regional Signal Definition}
 
-Taken together, these four signatures provide a coherent and mutually reinforcing characterization of GBM as a network-level pathology. The scale-free amplification of hub dysregulation, the emergence of aberrant dense clique substructures, the entrenchment of a tightly co-regulated oncogenic core alongside peripheral fragmentation, and the spectral signature of antagonistic gene modules all point to the same underlying biological reality: cancer rewires the gene regulatory network in ways that are mathematically distinctive and statistically reproducible. No single signature is sufficient on its own, but in combination they constitute a robust topological fingerprint of malignancy.
+Given a subject-level image $I^{(s)}(\mathbf{r})$ in common space and an atlas region $\Omega_i$, a node-wise regional summary signal is defined as
+\begin{equation}
+x_i^{(s)}
+=
+\frac{1}{\mu(\Omega_i)} \int_{\Omega_i} I^{(s)}(\mathbf{r})\,d\mathbf{r}.
+\end{equation}
+Stacking across all nodes yields the graph signal $x^{(s)} \in \mathbb{R}^{N}$.
 
-\subsection{Summary of Statistical Results}
+Two particularly important signals are:
+\begin{enumerate}[label=(\alph*)]
+    \item the mean T1 signal $x_{\mathrm{t1}}^{(s)}$, and
+    \item the tumor burden signal $x_{\mathrm{tumor}}^{(s)}$, where
+    \begin{equation}
+    x^{(s)}_{\mathrm{tumor},i}
+    =
+    \frac{1}{|\Omega_i|}
+    \sum_{\mathbf{r}\in\Omega_i} M^{(s)}(\mathbf{r}),
+    \end{equation}
+    with $M^{(s)}(\mathbf{r})\in\{0,1\}$ the tumor mask.
+\end{enumerate}
 
-Table~\ref{tab:results} summarizes the key computed metrics and their Mann--Whitney $U$ test $p$-values across the cancer and normal networks.
+The tumor burden by atlas node for a representative case is shown in Figure~\ref{fig:tumor_by_node}, revealing spatially nonuniform disease distribution over the connectome.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{chapter4_assets/tumor-by-atlas-node-main.png}
+    \caption{Tumor burden by atlas node for a representative GBM subject. The node-wise tumor fraction defines a graph signal that can be analyzed spectrally and spatially.}
+    \label{fig:tumor_by_node}
+\end{figure}
+
+\subsection{Cohort Mean Signals and Disease-Related Spatial Contrast}
+
+Let $\mathcal{S}_{\mathrm{GBM}}$ and $\mathcal{S}_{\mathrm{H}}$ denote the GBM and healthy cohorts. Their mean signals are
+\begin{align}
+\bar x_{\mathrm{GBM}} &= \frac{1}{|\mathcal{S}_{\mathrm{GBM}}|}\sum_{s\in\mathcal{S}_{\mathrm{GBM}}} x^{(s)},\\
+\bar x_{\mathrm{H}} &= \frac{1}{|\mathcal{S}_{\mathrm{H}}|}\sum_{s\in\mathcal{S}_{\mathrm{H}}} x^{(s)}.
+\end{align}
+A natural disease contrast is then
+\begin{equation}
+\Delta x = \bar x_{\mathrm{GBM}} - \bar x_{\mathrm{H}}.
+\end{equation}
+
+Figure~\ref{fig:mean_signal_graphs} visualizes the mean GBM signal, mean healthy signal, and the cohort-level difference over the shared connectome. The disease effect is not spatially uniform; instead it is concentrated over subsets of regions, motivating graph-based multiscale analysis.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/disease-normal-delta-connectome.png}
+    \caption{Cohort mean graph signals and their difference. Left: mean GBM node signal. Middle: mean healthy node signal. Right: GBM minus healthy mean signal. Disease-related deviations are spatially structured over the graph rather than randomly distributed.}
+    \label{fig:mean_signal_graphs}
+\end{figure}
+
+Figure~\ref{fig:gbm_mean_presence} shows the average tumor presence over the shared graph, providing a biologically interpretable disease burden map.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.62\textwidth]{chapter4_assets/gbm-mean-presence.png}
+    \caption{Average GBM tumor presence projected onto the shared graph. This cohort-level map indicates which atlas nodes are most frequently involved by tumor across GBM subjects.}
+    \label{fig:gbm_mean_presence}
+\end{figure}
+
+% -----------------------------------------------------------------------------
+%     Section 4: Spectral Graph Analysis
+% -----------------------------------------------------------------------------
+\section{Spectral Graph Analysis of Brain Signals}
+\label{sec:spectral}
+
+\subsection{Graph Fourier Transform}
+
+The graph Laplacian $L$ is real symmetric and admits the eigendecomposition
+\begin{equation}
+\label{eq:laplacian_eigendecomp}
+L = U \Lambda U^\top,
+\end{equation}
+where
+\[
+U = [u_1,\dots,u_N], \qquad
+\Lambda = \mathrm{diag}(\lambda_1,\dots,\lambda_N),
+\]
+with $0=\lambda_1 \le \lambda_2 \le \cdots \le \lambda_N$.
+The graph Fourier transform (GFT) of a signal $x\in\mathbb{R}^N$ is defined by
+\begin{equation}
+\hat x = U^\top x,
+\end{equation}
+with inverse transform
+\begin{equation}
+x = U \hat x = \sum_{k=1}^{N} \hat x_k u_k.
+\end{equation}
+Low graph frequencies correspond to Laplacian eigenvectors with small eigenvalues and vary slowly over strongly connected regions, whereas high graph frequencies oscillate more sharply across neighboring nodes.
+
+\subsection{Dirichlet Energy and Spectral Smoothness}
+
+A central quantity is the graph Dirichlet energy:
+\begin{equation}
+\label{eq:dirichlet_energy}
+\mathcal{E}(x)
+=
+x^\top L x
+=
+\frac{1}{2}\sum_{i=1}^{N}\sum_{j=1}^{N} W_{ij}(x_i-x_j)^2.
+\end{equation}
+Equation~\eqref{eq:dirichlet_energy} gives two equivalent interpretations:
+\begin{enumerate}[label=(\arabic*)]
+    \item in the vertex domain, it penalizes edge-wise disagreement;
+    \item in the spectral domain, it weights energy by graph frequency.
+\end{enumerate}
+Indeed, using $L=U\Lambda U^\top$,
+\begin{equation}
+\mathcal{E}(x)
+=
+x^\top U\Lambda U^\top x
+=
+\hat x^\top \Lambda \hat x
+=
+\sum_{k=1}^{N} \lambda_k |\hat x_k|^2.
+\end{equation}
+Thus a signal is smooth if most of its spectral mass lies at low eigenvalues.
+
+\subsection{Spectral Biomarkers}
+
+Several scalar spectral descriptors summarize graph signals compactly.
+
+\paragraph{Spectral centroid.}
+The spectral centroid quantifies where the signal is centered in graph frequency:
+\begin{equation}
+\label{eq:spectral_centroid}
+C_{\mathrm{spec}}(x)
+=
+\frac{\sum_{k=1}^{N} \lambda_k |\hat x_k|^2}
+{\sum_{k=1}^{N} |\hat x_k|^2}.
+\end{equation}
+This is the energy-weighted average graph frequency. Higher values imply a shift toward less smooth components.
+
+\paragraph{Spectral entropy.}
+Define normalized spectral weights $p_k = |\hat x_k|^2 / \sum_{\ell} |\hat x_\ell|^2$. Then the spectral entropy is
+\begin{equation}
+\label{eq:spectral_entropy}
+H_{\mathrm{spec}}(x)
+=
+-\sum_{k=1}^{N} p_k \log p_k.
+\end{equation}
+Higher entropy indicates a more diffuse spectral distribution.
+
+\paragraph{Low- and high-frequency energy.}
+Let $\mathcal{K}_{\mathrm{low}}$ and $\mathcal{K}_{\mathrm{high}}$ denote index sets of low and high graph frequencies. Then
+\begin{equation}
+E_{\mathrm{low}}(x)=\sum_{k\in\mathcal{K}_{\mathrm{low}}} |\hat x_k|^2, \qquad
+E_{\mathrm{high}}(x)=\sum_{k\in\mathcal{K}_{\mathrm{high}}} |\hat x_k|^2.
+\end{equation}
+Larger $E_{\mathrm{high}}$ indicates sharper spatial variation and reduced smoothness.
+
+Figure~\ref{fig:cancer_vs_normal_spectra} compares the mean spectra of the GBM and healthy cohorts. The healthy cohort shows stronger content across a broader range of graph frequencies, while the GBM cohort exhibits a different distribution of spectral power, especially in lower-to-mid frequencies.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{chapter4_assets/cancervsnormal-spectra.png}
+    \caption{Mean graph spectra for GBM and healthy cohorts. The spectra are plotted as spectral power versus graph frequency (Laplacian eigenvalue), highlighting disease-related redistribution of energy across graph harmonics.}
+    \label{fig:cancer_vs_normal_spectra}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/spectral_metrics.png}
+    \caption{Mean spectral metrics by cohort: low-frequency energy, high-frequency energy, spectral centroid, and spectral entropy. These compact descriptors summarize the organization of graph signal energy across the spectrum.}
+    \label{fig:mean_spectral_metrics}
+\end{figure}
+
+The distributional comparisons in Figure~\ref{fig:mean_spectral_metrics} confirm that the healthy cohort tends to exhibit larger high-frequency energy, larger centroid, and larger entropy than the GBM tumor signal. Table~\ref{tab:spectral_metrics_interpretation} summarizes the interpretation of these spectral biomarkers.
 
 \begin{table}[H]
-\centering
-\caption{Summary of Statistical Results Across the Four Mathematical Signatures}
-\label{tab:results}
-\renewcommand{\arraystretch}{1.6}
-\resizebox{\textwidth}{!}{
-\begin{tabular}{@{}lllll@{}}
-\toprule
-\textbf{Signature} & \textbf{Cancer Network} & \textbf{Normal Network} & \textbf{Direction} & \textbf{$p$-value} \\
-\hline
-Power-law exponent $\widehat{\alpha}$ & Lower ($\approx 2.0$--$2.5$) & Higher ($\approx 2.5$--$3.5$) & Cancer $<$ Normal & $< 0.05$ \\
-\hline
-Clique cover number $\theta(G)$ & Higher & Lower & Cancer $>$ Normal & $< 0.05$ \\
-\hline
-Maximum coreness $\max_v \phi(v)$ & Higher & Lower & Cancer $>$ Normal & $< 0.05$ \\
-\hline
-Algebraic connectivity $\lambda_2$ & Lower & Higher & Cancer $<$ Normal & $< 0.05$ \\
-\hline
-Negative eigenvalue count & Present & Absent & Cancer $>$ Normal & $< 0.05$ \\
-\bottomrule
-\end{tabular}
-}
+    \centering
+    \caption{Spectral biomarkers and their interpretation in the connectome graph setting.}
+    \label{tab:spectral_metrics_interpretation}
+    \begin{tabular}{p{3.0cm} p{4.3cm} p{7.0cm}}
+        \toprule
+        \textbf{Metric} & \textbf{Formula} & \textbf{Interpretation} \\
+        \midrule
+        Low-frequency energy &
+        $E_{\mathrm{low}}=\sum_{k\in\mathcal{K}_{\mathrm{low}}} |\hat x_k|^2$ &
+        Measures signal power concentrated in smooth graph harmonics. Larger values imply stronger global smoothness. \\
+        \addlinespace
+        High-frequency energy &
+        $E_{\mathrm{high}}=\sum_{k\in\mathcal{K}_{\mathrm{high}}} |\hat x_k|^2$ &
+        Measures signal power concentrated in rapidly varying graph harmonics. Larger values imply sharper regional contrast. \\
+        \addlinespace
+        Spectral centroid &
+        $C_{\mathrm{spec}}=\dfrac{\sum_k \lambda_k |\hat x_k|^2}{\sum_k |\hat x_k|^2}$ &
+        Energy-weighted average graph frequency. Higher values indicate the spectrum is shifted toward less smooth components. \\
+        \addlinespace
+        Spectral entropy &
+        $H_{\mathrm{spec}}=-\sum_k p_k\log p_k$ &
+        Quantifies how diffuse the spectrum is. Higher values indicate more distributed energy across modes. \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
-\subsection{Conclusion}
+% -----------------------------------------------------------------------------
+%     Section 5: Graph Wavelet Analysis
+% -----------------------------------------------------------------------------
+\section{Graph Wavelet Analysis}
+\label{sec:wavelets}
 
-This study demonstrates that glioblastoma multiforme leaves reproducible and statistically significant mathematical signatures in gene coexpression networks. By applying four complementary graph-theoretic tools---degree distribution and power-law exponent, clique cover number and Ramsey theory, $k$-core decomposition, and signed Laplacian spectral analysis---we show that GBM networks differ from normal brain networks in ways that are both visually apparent and statistically confirmed across all tested metrics.
+Spectral descriptors summarize overall distribution of graph frequency content but do not explicitly preserve localization in both vertex and scale domains. Graph wavelets address this by defining multiscale filters on the Laplacian spectrum.
 
-These signatures collectively reflect the emergent topology of malignancy: scale-free amplification of hub dysregulation, aberrant clique substructure arising from oncogenic co-activation, deeply entrenched co-regulated core modules, and antagonistic spectral components absent in healthy tissue. The approach is computationally tractable, mathematically rigorous, and biologically interpretable, offering a promising complement to existing genomic screening paradigms.
+\subsection{Spectral Graph Wavelets}
 
-The primary limitation of this study is that results are drawn from a single cancer type and a single trial network. Future work should apply this framework to a meta-analysis spanning multiple cancer types to determine whether the four signatures generalize across malignancies or whether distinct cancers leave topologically distinct fingerprints. Integrating these network-level signatures with clinical metadata---patient age, tumor grade, treatment history---could enable patient-level risk stratification and, ultimately, the development of graph-theoretic biomarkers for early cancer detection and prevention.
+Let $g(\cdot)$ be a spectral kernel. A graph wavelet operator at scale $\tau>0$ is
+\begin{equation}
+T_{g}^{(\tau)} = g(\tau L) = U\,g(\tau \Lambda)\,U^\top,
+\end{equation}
+where $g(\tau \Lambda) = \mathrm{diag}\!\big(g(\tau\lambda_1),\dots,g(\tau\lambda_N)\big)$.
+Applying this operator to a graph signal $x$ gives the scale-dependent wavelet coefficients
+\begin{equation}
+w^{(\tau)} = T_{g}^{(\tau)}x.
+\end{equation}
+For heat-kernel-style diffusion wavelets one may use $g(\tau\lambda)=e^{-\tau\lambda}$, where small $\tau$ emphasizes finer detail and large $\tau$ emphasizes coarser smoothing. The scale-dependent wavelet energy
+\begin{equation}
+E_{\mathrm{wav}}(\tau;x) = \|w^{(\tau)}\|_2^2
+=
+\sum_{k=1}^{N} |g(\tau\lambda_k)|^2 |\hat x_k|^2
+\end{equation}
+provides a useful bridge between descriptive multiscale analysis and graph-regularized learning.
+
+\subsection{Multiscale Disease Separation}
+
+Figure~\ref{fig:wavelet_boxplots} shows multiscale graph wavelet energy at $\tau=1,5,10,20$. Healthy T1 signals exhibit markedly larger wavelet energy at smaller and intermediate scales, while the GBM tumor signal remains comparatively small and compressed. Wavelet energy is especially informative because signals with high fine-scale wavelet energy necessarily retain more localized irregularity on the graph, which is closely related to larger Dirichlet energy and therefore to a larger smoothness penalty in the learning objective.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/wavelet-box-whisker.png}
+    \caption{Multiscale graph wavelet energy across cohorts at scales $\tau=1,5,10,20$. The strongest group differences occur at smaller scales, where healthy T1 signals display substantially larger wavelet energy than GBM tumor signals.}
+    \label{fig:wavelet_boxplots}
+\end{figure}
+
+% -----------------------------------------------------------------------------
+%     Section 6: Diffusion Dynamics and Smoothness
+% -----------------------------------------------------------------------------
+\section{Diffusion Dynamics and Dirichlet Smoothness}
+\label{sec:diffusion}
+
+\subsection{Heat Diffusion Model}
+
+A standard physical interpretation of graph smoothness is diffusion. Let $f(t)\in\mathbb{R}^N$ be a time-dependent graph signal satisfying
+\begin{equation}
+\frac{d f(t)}{dt} = -L f(t), \qquad f(0)=f_0.
+\end{equation}
+The solution is
+\begin{equation}
+\label{eq:heat_solution}
+f(t)=e^{-tL}f_0 = U e^{-t\Lambda} U^\top f_0.
+\end{equation}
+Because each spectral component decays as $e^{-t\lambda_k}$, high-frequency components vanish more rapidly than low-frequency ones. The derivative of the squared norm under heat diffusion satisfies
+\begin{equation}
+\frac{d}{dt}\|f(t)\|_2^2
+=
+-2 f(t)^\top L f(t)
+=
+-2 \mathcal{E}(f(t)),
+\end{equation}
+so Dirichlet energy measures the instantaneous rate at which signal energy is dissipated by diffusion. Signals with large Dirichlet energy contain sharp edge-wise discrepancies and smooth quickly; signals with small Dirichlet energy are already smooth and diffuse slowly.
+
+\subsection{Interpretation for Brain Signals}
+
+The smoothness assumption does \emph{not} mean that disease effects are spatially uniform. Rather, it imposes that the \emph{learned predictive representation} should avoid gratuitous node-to-node oscillation not supported by the graph structure. The objective is not to maximize smoothness at all costs but to minimize
+\[
+\mathcal{L}_{\text{pred}} + \lambda \mathcal{L}_{\text{smooth}},
+\]
+so that the retained variation is the variation needed for discrimination.
+
+% -----------------------------------------------------------------------------
+%     Section 7: Geometric Deep Learning
+% -----------------------------------------------------------------------------
+\section{Geometric Deep Learning for Connectome Prediction}
+\label{sec:gdl}
+
+\subsection{Model Overview}
+
+Given a graph $G=(V,E,W)$ and subject signal $x^{(s)}$, the goal is to predict whether the subject belongs to the GBM or healthy cohort. A graph neural network (GNN) maps node features to a graph-level representation and then to a class probability:
+\begin{equation}
+\hat y^{(s)} = \sigma\!\big(\phi_{\mathrm{readout}}(H^{(L,s)})\big),
+\end{equation}
+where $H^{(L,s)}\in\mathbb{R}^{N\times F_L}$ is the node embedding matrix after $L$ layers, $\phi_{\mathrm{readout}}$ is a graph-level pooling function, and $\sigma$ is the logistic sigmoid.
+
+\subsection{Message Passing and Graph Convolution}
+
+A standard message passing layer is
+\begin{equation}
+h_i^{(\ell+1)}
+=
+\psi^{(\ell)}
+\!\left(
+h_i^{(\ell)},
+\;
+\bigoplus_{j\in\mathcal{N}(i)}
+\phi^{(\ell)}(h_i^{(\ell)},h_j^{(\ell)},e_{ij})
+\right),
+\end{equation}
+where $\oplus$ is a permutation-invariant aggregation. For a graph convolution using the normalized adjacency,
+\begin{equation}
+\label{eq:gcn_layer}
+H^{(\ell+1)}
+=
+\rho\!\left(
+\widetilde D^{-1/2}\widetilde W \widetilde D^{-1/2}
+H^{(\ell)} \Theta^{(\ell)}
+\right),
+\end{equation}
+where $\widetilde W = W + I$, $\widetilde D$ is its degree matrix, $\Theta^{(\ell)}$ are learnable weights, and $\rho$ is a pointwise nonlinearity. Equation~\eqref{eq:gcn_layer} shows explicitly how the graph topology constrains feature mixing across neighboring regions.
+
+\subsection{Graph-Level Readout}
+
+The graph-level embedding is formed by global mean pooling,
+\begin{equation}
+z^{(s)} = \frac{1}{N}\sum_{i=1}^{N} h_i^{(L,s)},
+\end{equation}
+and the predicted probability is
+\begin{equation}
+\hat p^{(s)} = \sigma(w^\top z^{(s)} + b) = \frac{1}{1+e^{-\eta^{(s)}}}.
+\end{equation}
+
+\subsection{Training Objective}
+
+The task-specific prediction loss is binary cross-entropy:
+\begin{equation}
+\label{eq:bce_loss}
+\mathcal{L}_{\mathrm{pred}}
+=
+-\frac{1}{M}\sum_{s=1}^{M}
+\left[
+y^{(s)}\log \hat p^{(s)} + \big(1-y^{(s)}\big)\log\big(1-\hat p^{(s)}\big)
+\right].
+\end{equation}
+The smoothness penalty uses a matrix-valued generalization of graph Dirichlet energy over learned embeddings $H^{(L,s)}$:
+\begin{equation}
+\label{eq:smoothness_loss}
+\mathcal{L}_{\mathrm{smooth}}
+=
+\frac{1}{M}\sum_{s=1}^{M}
+\mathrm{Tr}\!\left((H^{(L,s)})^\top L H^{(L,s)}\right)
+=
+\frac{1}{2M}\sum_{s=1}^{M}\sum_{i,j}W_{ij}
+\|h_i^{(L,s)} - h_j^{(L,s)}\|_2^2.
+\end{equation}
+Thus neighboring nodes with strong graph affinity are encouraged to have similar final embeddings unless task-specific gradients force them apart. The gradient of the smoothness term with respect to $H^{(L,s)}$ is
+\begin{equation}
+\frac{\partial}{\partial H^{(L,s)}}
+\mathrm{Tr}\!\left((H^{(L,s)})^\top L H^{(L,s)}\right)
+=
+2L H^{(L,s)},
+\end{equation}
+so the smoothness gradient acts as a graph diffusion operator on learned node embeddings.
+
+Table~\ref{tab:training_objective_summary} summarizes the components of the training objective.
+
+\begin{table}[H]
+    \centering
+    \caption{Training objective components and interpretations.}
+    \label{tab:training_objective_summary}
+    \begin{tabular}{p{3.6cm} p{5.2cm} p{6.2cm}}
+        \toprule
+        \textbf{Component} & \textbf{Formula} & \textbf{Purpose} \\
+        \midrule
+        Prediction loss &
+        $\mathcal{L}_{\mathrm{pred}}
+        =-\frac{1}{M}\sum_s \big[y^{(s)}\log \hat p^{(s)}+(1-y^{(s)})\log(1-\hat p^{(s)})\big]$ &
+        Encourages accurate subject-level disease classification. \\
+        \addlinespace
+        Smoothness penalty &
+        $\mathcal{L}_{\mathrm{smooth}}
+        =\frac{1}{M}\sum_s \mathrm{Tr}\big((H^{(L,s)})^\top L H^{(L,s)}\big)$ &
+        Penalizes edge-wise discrepancies in learned node embeddings. \\
+        \addlinespace
+        Total objective &
+        $\mathcal{L}_{\mathrm{total}}
+        = \mathcal{L}_{\mathrm{pred}}+\lambda \mathcal{L}_{\mathrm{smooth}}$ &
+        Balances classification performance against graph-structured regularity. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% -----------------------------------------------------------------------------
+%     Section 8: Results and Discussion
+% -----------------------------------------------------------------------------
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Geometric Deep Learning Results}
+
+The geometric deep learning workflow and training curves are shown in Figure~\ref{fig:geometric_deep_learning}. The training curves reveal three important patterns:
+\begin{enumerate}[label=(\alph*)]
+    \item the total loss decreases smoothly on both train and test sets;
+    \item classification accuracy improves to perfect separation on the reported split;
+    \item the smoothness penalty increases as training proceeds, while the prediction loss decreases.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/geometric-deep-learning.png}
+    \caption{Geometric deep learning results. Top-left: training and test total loss curves. Top-right: evolution of the task-specific prediction loss and the smoothness penalty. Bottom-left: training and test accuracy. Bottom-right: test confusion matrix showing perfect separation on the reported split.}
+    \label{fig:geometric_deep_learning}
+\end{figure}
+
+The third pattern is particularly informative: to improve discrimination, the model learns embeddings that are less smooth than at initialization. This is not contradictory---the objective minimizes the \emph{sum} of task loss and smoothness penalty, so the optimum may legitimately move toward a higher smoothness term when that increase is more than compensated by a larger reduction in $\mathcal{L}_{\mathrm{pred}}$. The regularizer does not prohibit task-relevant graph variation; it discourages gratuitous variation.
+
+The test confusion matrix shows $6/6$ healthy and $3/3$ GBM examples correctly classified on the reported split. The PCA projection of learned subject embeddings (Figure~\ref{fig:pca_projection}) further demonstrates clear class separation.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.62\textwidth]{chapter4_assets/pca-projection.png}
+    \caption{PCA projection of learned subject embeddings. Healthy subjects form a compact cluster, while GBM subjects occupy a well-separated region of the embedding space.}
+    \label{fig:pca_projection}
+\end{figure}
+
+\subsection{Spectral Biomarker Summary}
+
+The descriptive analyses confirm that disease and healthy cohorts differ in how signal energy is distributed over graph frequencies and graph scales. The key findings are:
+\begin{itemize}
+    \item GBM tumor signals are more concentrated in lower graph frequencies;
+    \item healthy T1 signals exhibit higher spectral centroid, higher entropy, and higher high-frequency energy;
+    \item multiscale wavelet energy is largest in healthy signals, especially at smaller scales;
+    \item disease effects are localized over specific atlas nodes and subnetworks rather than uniformly distributed.
+\end{itemize}
+
+These observations justify using graph-structured regularization in a classifier: the graph carries biologically meaningful spatial organization, and the spectrum provides an interpretable basis for quantifying disease-related departures from typical organization.
+
+\subsection{Stability and Robustness}
+
+The methodology combines a fixed shared graph with subject-varying signals, offering several stability advantages:
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{Common node semantics:} every node corresponds to the same atlas region across subjects;
+    \item \textbf{Shared spectral basis:} the eigenvectors of the common graph provide a single reference frame for all GFT analyses;
+    \item \textbf{Regularized learning:} the Dirichlet penalty reduces the risk of overfitting to noisy subject-specific node fluctuations.
+\end{enumerate}
+
+If the observed signal is $x = x^\star + \varepsilon$ where $\varepsilon$ is noise, then
+\begin{equation}
+\mathcal{E}(x)
+=
+\mathcal{E}(x^\star)
++
+2(x^\star)^\top L \varepsilon
++
+\mathcal{E}(\varepsilon),
+\end{equation}
+and noise concentrated at high graph frequencies inflates the Dirichlet energy because $\mathcal{E}(\varepsilon)=\sum_{k}\lambda_k |\hat\varepsilon_k|^2$. Thus the smoothness penalty preferentially suppresses high-frequency noise, giving it a denoising interpretation in addition to its role as a structural prior.
+
+% -----------------------------------------------------------------------------
+%     Section 9: Conclusion
+% -----------------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper establishes a full graph signal processing pipeline for atlas-based brain connectome analysis of glioblastoma multiforme. The main contributions are:
+\begin{enumerate}[label=(\arabic*)]
+    \item a shared 48-node Harvard--Oxford atlas graph representation for all subjects,
+    \item graph signal definitions for T1 intensity and tumor burden,
+    \item spectral biomarkers including high-frequency energy, spectral centroid, and spectral entropy,
+    \item multiscale graph wavelet analysis of disease-related signals,
+    \item a diffusion-based interpretation of smoothness via Dirichlet energy, and
+    \item a geometric deep learning classifier trained under a smoothness-regularized objective.
+\end{enumerate}
+
+The central conclusion is that connectome-aware analysis is valuable both descriptively and predictively. Descriptively, the graph Fourier basis and graph wavelets reveal where disease-related information is located across graph frequencies and scales. Predictively, the same graph supports the smoothness-regularized learning objective:
+\[
+\mathcal{L}_{\mathrm{total}}
+=
+\mathcal{L}_{\mathrm{pred}}
++
+\lambda \mathcal{L}_{\mathrm{smooth}},
+\]
+which is principled because it reflects the assumption that neighboring brain regions should generally have related latent representations, except where the classification task benefits from preserving edge-wise contrast. The results support the view that disease-related brain patterns are best understood as graph signals over a biologically meaningful network, and that the combination of spectral analysis, graph wavelets, and smoothness-regularized geometric learning provides a coherent framework for both mechanistic interpretation and accurate prediction.
+
+\FloatBarrier
+
+% -----------------------------------------------------------------------------
+%     Notation Table
+% -----------------------------------------------------------------------------
+\begin{table}[H]
+    \centering
+    \caption{Compact notation summary.}
+    \label{tab:notation}
+    \begin{tabular}{p{2.6cm} p{11.8cm}}
+        \toprule
+        \textbf{Symbol} & \textbf{Meaning} \\
+        \midrule
+        $G=(V,E,W)$ & Weighted undirected connectome graph with node set $V$, edge set $E$, and adjacency matrix $W$. \\
+        $N$ & Number of graph nodes (here $N=48$). \\
+        $D$ & Degree matrix, $D_{ii}=\sum_j W_{ij}$. \\
+        $L$ & Combinatorial graph Laplacian, $L=D-W$. \\
+        $L_{\mathrm{sym}}$ & Symmetric normalized Laplacian, $I-D^{-1/2}WD^{-1/2}$. \\
+        $x^{(s)}$ & Graph signal for subject $s$. \\
+        $\hat x$ & Graph Fourier transform of $x$, $\hat x = U^\top x$. \\
+        $U,\Lambda$ & Laplacian eigenvectors and eigenvalues, $L=U\Lambda U^\top$. \\
+        $\mathcal{E}(x)$ & Dirichlet energy, $x^\top L x$. \\
+        $E_{\mathrm{high}}$ & High-frequency spectral energy. \\
+        $C_{\mathrm{spec}}$ & Spectral centroid. \\
+        $H_{\mathrm{spec}}$ & Spectral entropy. \\
+        $H^{(L,s)}$ & Final-layer node embedding matrix for subject $s$. \\
+        $\mathcal{L}_{\mathrm{pred}}$ & Task-specific prediction loss (binary cross-entropy). \\
+        $\mathcal{L}_{\mathrm{smooth}}$ & Smoothness penalty based on Dirichlet energy of learned embeddings. \\
+        $\lambda$ & Regularization strength balancing prediction and smoothness. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 % -----------------------------------------------------------------------------
 %     References
