@@ -94,7 +94,7 @@ Satyavathi Dronamraju\textsuperscript{3}
 %     Abstract
 % -----------------------------------------------------------------------------
 \begin{abstract}
-We develop a graph signal processing (GSP) framework for analyzing atlas-based brain connectomes and training a geometric deep learning model for glioblastoma multiforme (GBM) prediction under an explicit smoothness prior. Regional MRI measurements are represented as signals over a shared 48-node Harvard--Oxford cortical atlas graph, enabling analysis in both the vertex and spectral domains. The graph Fourier transform, Dirichlet energy, spectral centroid, spectral entropy, and multiscale graph wavelets are used to characterize disease-related deviations from healthy brain organization. GBM signals are found to concentrate in lower graph frequencies with reduced spectral entropy compared to healthy cohorts, while multiscale wavelet energy distinguishes cohorts at fine and intermediate scales. A graph neural network classifier trained under a smoothness-regularized objective---combining binary cross-entropy prediction loss with a Dirichlet energy penalty on learned node embeddings---achieves perfect class separation on the reported cohort. The smoothness penalty acts as a graph diffusion operator on learned representations, suppressing graph-inconsistent variation while preserving task-relevant disease contrast. Together, the spectral analysis and regularized learning framework provide a principled, interpretable approach to connectome-aware disease prediction.
+We develop a graph signal processing (GSP) framework for analyzing atlas-based brain connectomes and training a geometric deep learning model for glioblastoma multiforme (GBM) prediction under an explicit smoothness prior. Structural MRI from two complementary public sources---the healthy IXI cohort and the University of Pennsylvania glioblastoma (UPENN-GBM) collection distributed through The Cancer Imaging Archive---is registered to a common MNI152 reference space and summarized over a shared 48-node Harvard--Oxford cortical atlas graph, so that each scan becomes a signal that can be analyzed jointly in the vertex and spectral domains. The graph Fourier transform, Dirichlet energy, spectral centroid, spectral entropy, and multiscale spectral graph wavelets are used to characterize disease-related deviations from healthy brain organization. GBM signals concentrate in lower graph frequencies with reduced spectral entropy relative to healthy cohorts, while multiscale wavelet energy separates cohorts at fine and intermediate scales. A graph neural network classifier trained under a smoothness-regularized objective---combining binary cross-entropy prediction loss with a Dirichlet energy penalty on learned node embeddings---achieves perfect class separation on the reported cohort. We show analytically that the smoothness penalty acts as a graph diffusion operator on learned representations, suppressing graph-inconsistent, high-frequency variation while preserving task-relevant disease contrast, and that it doubles as a denoising prior. Together, the spectral analysis and regularized learning framework provide a principled, interpretable, and reproducible approach to connectome-aware disease prediction that connects classical spectral graph theory with modern geometric deep learning.
 \end{abstract}
 
 \maketitle
@@ -105,7 +105,11 @@ We develop a graph signal processing (GSP) framework for analyzing atlas-based b
 \section{Introduction}
 \label{sec:intro}
 
-Brain imaging data are naturally structured: measurements are not independent across space, but are constrained by anatomy, functional relationships, and long-range organization. When regional quantities are aggregated over a cortical atlas, each brain scan may be described as a signal over a set of graph nodes, where nodes correspond to regions of interest (ROIs) and edges encode inter-regional affinity. This representation makes graph signal processing (GSP) a natural mathematical language for studying how disease perturbs spatial organization.
+Brain imaging data are naturally structured: measurements are not independent across space but are constrained by anatomy, functional relationships, and long-range organization~\cite{bullmore2009complex,sporns2005human}. Over the past two decades, network neuroscience has established that the brain is profitably modeled as a graph whose nodes are anatomically defined regions and whose edges encode structural or statistical affinity~\cite{bassett2017network,rubinov2010complex}. When regional quantities are aggregated over a cortical atlas, each brain scan may be described as a \emph{signal over a set of graph nodes}, where nodes correspond to regions of interest (ROIs) and edges encode inter-regional affinity. This representation makes graph signal processing (GSP) a natural mathematical language for studying how disease perturbs spatial organization~\cite{shuman2013emerging,ortega2018graph,sandryhaila2013discrete}.
+
+GSP generalizes classical harmonic analysis from regular domains (time series, images) to irregular graph domains by using the eigenvectors of the graph Laplacian as a Fourier basis~\cite{shuman2013emerging,chung1997spectral}. This machinery---the graph Fourier transform, spectral filtering, and spectral graph wavelets~\cite{hammond2011wavelets}---has proven especially informative in neuroimaging, where the alignment (or misalignment) of activity with the underlying anatomical network carries functional meaning~\cite{huang2018graph,medaglia2018functional}. At the same time, geometric deep learning has extended convolutional architectures to graphs~\cite{bronstein2017geometric}, with graph convolutional networks~\cite{kipf2017semi}, localized spectral filters~\cite{defferrard2016convolutional}, and message-passing formulations~\cite{gilmer2017neural} now forming a mature toolbox for learning on non-Euclidean domains~\cite{wu2021comprehensive}. Our work sits at the intersection of these two threads: we use spectral graph theory both to \emph{describe} disease-related signal structure and to \emph{regularize} a learned classifier.
+
+The clinical target is glioblastoma multiforme (GBM), a WHO grade 4 diffuse astrocytic glioma that is the most common and most aggressive primary malignant brain tumor in adults, with poor prognosis despite maximal resection, radiotherapy, and temozolomide chemotherapy~\cite{louis2021who,stupp2005radiotherapy}. GBM is diffusely infiltrative and spatially heterogeneous, so a connectome-aware representation that captures \emph{where} and \emph{how} tumor-related signal departs from healthy organization is well matched to the biology of the disease. Public imaging resources now make such analyses reproducible: the IXI dataset provides nearly 600 healthy-subject multi-sequence MRI volumes~\cite{ixi_dataset}, while the University of Pennsylvania glioblastoma (UPENN-GBM) cohort distributed through The Cancer Imaging Archive (TCIA) provides multi-parametric MRI with expert tumor segmentations for a large de novo GBM population~\cite{bakas2022university,upenngbm_tcia,clark2013cancer}.
 
 Let
 \[
@@ -121,7 +125,7 @@ y^{(s)} \in \{0,1\},
 \]
 with $y^{(s)}=1$ representing GBM and $y^{(s)}=0$ representing healthy tissue.
 
-The central modeling principle is that biologically meaningful graph signals often exhibit \emph{piecewise smoothness}: neighboring regions tend to have related values unless disrupted by pathology. This motivates regularizing the learned predictive representation using graph Dirichlet energy. The resulting objective balances prediction fidelity against structural smoothness:
+The central modeling principle, inherited from spectral graph theory and semi-supervised learning on graphs~\cite{zhou2004learning,belkin2003laplacian,vonluxburg2007tutorial}, is that biologically meaningful graph signals often exhibit \emph{piecewise smoothness}: neighboring regions tend to have related values unless disrupted by pathology. This motivates regularizing the learned predictive representation using graph Dirichlet energy. The resulting objective balances prediction fidelity against structural smoothness:
 \begin{equation}
 \label{eq:main_objective_intro}
 \mathcal{L}_{\text{total}}
@@ -140,43 +144,38 @@ This paper unifies four threads:
     \item supervised learning with a prediction objective regularized by graph smoothness.
 \end{enumerate}
 
-The formulation is consistent across all analyses: the spectrum, graph wavelets, and smoothness measures serve both as descriptive tools and as principled regularizers in the supervised learning problem.
+The formulation is consistent across all analyses: the spectrum, graph wavelets, and smoothness measures serve both as descriptive tools and as principled regularizers in the supervised learning problem. The remainder of the paper follows a standard structure: Section~\ref{sec:methods} (Materials and Methods) describes the imaging cohorts, preprocessing, graph construction, spectral and wavelet operators, diffusion interpretation, and the geometric deep learning model; Section~\ref{sec:results} (Results) reports the descriptive spectral biomarkers and classifier performance; Section~\ref{sec:discussion} (Discussion) interprets the findings, situates them in the literature, and states limitations; and Section~\ref{sec:conclusion} (Conclusion) summarizes contributions.
 
 % -----------------------------------------------------------------------------
-%     Section 2: Construction of the Brain Connectome Graph
+%     Section 2: Materials and Methods
 % -----------------------------------------------------------------------------
-\section{Construction of the Brain Connectome Graph}
-\label{sec:graph_construction}
+\section{Materials and Methods}
+\label{sec:methods}
 
-\subsection{Network Definition}
+\subsection{Imaging Cohorts and Datasets}
+\label{sec:datasets}
 
-A common atlas provides a shared node set across subjects. The Harvard--Oxford cortical atlas defines $N=48$ cortical ROIs, giving a fixed graph topology for all subjects. Let the node set be
-\[
-V=\{1,\dots,48\}.
-\]
-An undirected edge $(i,j)\in E$ is included when regions $i$ and $j$ are considered anatomically or statistically connected in the shared reference graph. The graph is represented by its weighted adjacency matrix $W$, degree matrix $D$, and graph Laplacian $L$:
-\begin{align}
-W_{ij} &= W_{ji} \ge 0,\\
-D_{ii} &= \sum_{j=1}^{N} W_{ij},\\
-L &= D - W.
-\end{align}
-Because node degrees may vary, the normalized Laplacian is also useful:
-\begin{equation}
-\label{eq:normalized_laplacian}
-L_{\mathrm{sym}}
-=
-I - D^{-1/2} W D^{-1/2}.
-\end{equation}
-The normalized version permits comparison across regions with different connectivity levels and is particularly convenient for spectral analysis and graph convolutions.
+Two complementary, publicly available structural MRI resources define the healthy and disease cohorts, ensuring that the analysis is reproducible and that node semantics are shared across groups.
 
-\subsection{Atlas and Spatial Registration}
+\paragraph{Healthy cohort (IXI).}
+Healthy-brain reference signals are drawn from the IXI dataset (``Information eXtraction from Images''), a collection of nearly 600 MRI scans from normal, healthy subjects acquired at three London hospitals, comprising T1-, T2-, and PD-weighted, MRA, and diffusion-weighted images~\cite{ixi_dataset}. Because IXI subjects are free of focal pathology, their atlas-wise intensity signals provide a baseline model of typical, smoothly varying cortical organization against which disease-related departures are measured.
+
+\paragraph{Disease cohort (UPENN-GBM via TCIA).}
+Glioblastoma signals are drawn from the University of Pennsylvania glioblastoma (UPENN-GBM) cohort~\cite{bakas2022university}, distributed by The Cancer Imaging Archive (TCIA)~\cite{clark2013cancer,upenngbm_tcia}. UPENN-GBM provides multi-parametric MRI (mpMRI: pre- and post-contrast T1-weighted, T2-weighted, and T2-FLAIR) for de novo GBM patients, together with expert-reviewed tumor segmentation labels demarcating the enhancing tumor, peritumoral edema, and non-enhancing core. These segmentation labels, whose annotation protocol follows the conventions established by the BraTS benchmark and TCGA glioma collections~\cite{menze2015multimodal,bakas2017advancing}, yield the voxel-level tumor mask $M^{(s)}$ used to define node-wise tumor burden signals.
+
+Using an established public healthy reference (IXI) alongside an established public tumor reference (UPENN-GBM) means that every atlas node has a consistent anatomical interpretation across both cohorts, which is a prerequisite for the shared spectral basis exploited throughout Sections~\ref{sec:spectral}--\ref{sec:gdl}.
+
+\subsection{Preprocessing and Spatial Registration}
+\label{sec:preprocessing}
+
+To compare subjects on a common set of nodes, all volumes are mapped into a standard stereotaxic space. The nonlinear MNI152 template~\cite{fonov2011unbiased} serves as the common reference frame, and the Harvard--Oxford cortical atlas---derived from expert manual segmentations at the Center for Morphometric Analysis~\cite{makris2006decreased} and conceptually related to automated gyral parcellations of the cortex~\cite{desikan2006automated}---supplies the ROI labels that become graph nodes. Registration of subject images and tumor masks to MNI space follows standard neuroimaging pipelines using affine and nonlinear alignment as implemented in widely used toolkits such as FSL~\cite{jenkinson2012fsl} and ANTs~\cite{avants2011reproducible}.
 
 The atlas-based construction pipeline is illustrated in Figures~\ref{fig:mni_atlas} and~\ref{fig:tumor_mask_alignment}. The MNI152 template provides the common reference space, the Harvard--Oxford atlas provides ROI labels, and subject-level MRI and tumor masks are mapped into this space so that node-wise quantities can be computed consistently across the cohort.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.98\textwidth]{chapter4_assets/harvard-oxford-atlas.png}
-    \caption{Reference space and atlas definition. Left: MNI152 1\,mm template. Right: Harvard--Oxford atlas projected onto MNI space with 48 cortical regions. This atlas defines the graph nodes used throughout the analysis.}
+    \caption{Reference space and atlas definition. Left: MNI152 1\,mm template~\cite{fonov2011unbiased}. Right: Harvard--Oxford atlas~\cite{makris2006decreased} projected onto MNI space with 48 cortical regions. This atlas defines the graph nodes used throughout the analysis.}
     \label{fig:mni_atlas}
 \end{figure}
 
@@ -189,9 +188,33 @@ The atlas-based construction pipeline is illustrated in Figures~\ref{fig:mni_atl
 
 After registration, each atlas node receives a region-level summary statistic, such as the mean T1 intensity or the fraction of voxels covered by tumor.
 
-\subsection{Descriptive Topology of the Shared Connectome}
+\subsection{Construction of the Brain Connectome Graph}
+\label{sec:graph_construction}
 
-Figure~\ref{fig:connectome_descriptive_statistics} summarizes the degree distribution, clustering coefficient distribution, betweenness centrality distribution, and graph visualizations colored by several node-level attributes.
+\subsubsection{Network Definition}
+
+A common atlas provides a shared node set across subjects. The Harvard--Oxford cortical atlas defines $N=48$ cortical ROIs, giving a fixed graph topology for all subjects. Let the node set be
+\[
+V=\{1,\dots,48\}.
+\]
+An undirected edge $(i,j)\in E$ is included when regions $i$ and $j$ are considered anatomically or statistically connected in the shared reference graph. The graph is represented by its weighted adjacency matrix $W$, degree matrix $D$, and graph Laplacian $L$:
+\begin{align}
+W_{ij} &= W_{ji} \ge 0,\\
+D_{ii} &= \sum_{j=1}^{N} W_{ij},\\
+L &= D - W.
+\end{align}
+Because node degrees may vary, the normalized Laplacian~\cite{chung1997spectral} is also useful:
+\begin{equation}
+\label{eq:normalized_laplacian}
+L_{\mathrm{sym}}
+=
+I - D^{-1/2} W D^{-1/2}.
+\end{equation}
+The normalized version permits comparison across regions with different connectivity levels and is particularly convenient for spectral analysis and graph convolutions~\cite{kipf2017semi,defferrard2016convolutional}.
+
+\subsubsection{Descriptive Topology of the Shared Connectome}
+
+Standard network-neuroscience descriptors~\cite{rubinov2010complex} summarize the topology of the shared graph. Figure~\ref{fig:connectome_descriptive_statistics} reports the degree distribution, clustering coefficient distribution, betweenness centrality distribution, and graph visualizations colored by several node-level attributes.
 
 \begin{figure}[H]
     \centering
@@ -212,15 +235,12 @@ where $T_i$ is the number of triangles through node $i$. Betweenness centrality 
 \begin{equation}
 B_i = \sum_{\substack{s\neq i\neq t\\ s<t}} \frac{\sigma_{st}(i)}{\sigma_{st}},
 \end{equation}
-where $\sigma_{st}$ is the number of shortest paths from $s$ to $t$ and $\sigma_{st}(i)$ counts those passing through $i$. These graph properties matter because a smoothness penalty of the form $f^\top L f$ penalizes differences across edges; nodes with many strong incident edges contribute more strongly to the total regularization.
+where $\sigma_{st}$ is the number of shortest paths from $s$ to $t$ and $\sigma_{st}(i)$ counts those passing through $i$~\cite{rubinov2010complex}. These graph properties matter because a smoothness penalty of the form $f^\top L f$ penalizes differences across edges; nodes with many strong incident edges contribute more strongly to the total regularization, a fact tied to the algebraic connectivity of the graph~\cite{fiedler1973algebraic}.
 
-% -----------------------------------------------------------------------------
-%     Section 3: Brain Measurements as Graph Signals
-% -----------------------------------------------------------------------------
-\section{Brain Measurements as Graph Signals}
+\subsection{Brain Measurements as Graph Signals}
 \label{sec:signals}
 
-\subsection{Regional Signal Definition}
+\subsubsection{Regional Signal Definition}
 
 Given a subject-level image $I^{(s)}(\mathbf{r})$ in common space and an atlas region $\Omega_i$, a node-wise regional summary signal is defined as
 \begin{equation}
@@ -232,8 +252,8 @@ Stacking across all nodes yields the graph signal $x^{(s)} \in \mathbb{R}^{N}$.
 
 Two particularly important signals are:
 \begin{enumerate}[label=(\alph*)]
-    \item the mean T1 signal $x_{\mathrm{t1}}^{(s)}$, and
-    \item the tumor burden signal $x_{\mathrm{tumor}}^{(s)}$, where
+    \item the mean T1 signal $x_{\mathrm{t1}}^{(s)}$, computed from IXI (healthy) and UPENN-GBM (disease) T1-weighted volumes, and
+    \item the tumor burden signal $x_{\mathrm{tumor}}^{(s)}$, derived from the UPENN-GBM expert segmentations~\cite{bakas2022university}, where
     \begin{equation}
     x^{(s)}_{\mathrm{tumor},i}
     =
@@ -243,7 +263,7 @@ Two particularly important signals are:
     with $M^{(s)}(\mathbf{r})\in\{0,1\}$ the tumor mask.
 \end{enumerate}
 
-The tumor burden by atlas node for a representative case is shown in Figure~\ref{fig:tumor_by_node}, revealing spatially nonuniform disease distribution over the connectome.
+The tumor burden by atlas node for a representative case is shown in Figure~\ref{fig:tumor_by_node}, revealing spatially nonuniform disease distribution over the connectome, consistent with the diffusely infiltrative nature of GBM~\cite{louis2021who}.
 
 \begin{figure}[H]
     \centering
@@ -252,7 +272,7 @@ The tumor burden by atlas node for a representative case is shown in Figure~\ref
     \label{fig:tumor_by_node}
 \end{figure}
 
-\subsection{Cohort Mean Signals and Disease-Related Spatial Contrast}
+\subsubsection{Cohort Mean Signals and Disease-Related Spatial Contrast}
 
 Let $\mathcal{S}_{\mathrm{GBM}}$ and $\mathcal{S}_{\mathrm{H}}$ denote the GBM and healthy cohorts. Their mean signals are
 \begin{align}
@@ -264,7 +284,7 @@ A natural disease contrast is then
 \Delta x = \bar x_{\mathrm{GBM}} - \bar x_{\mathrm{H}}.
 \end{equation}
 
-Figure~\ref{fig:mean_signal_graphs} visualizes the mean GBM signal, mean healthy signal, and the cohort-level difference over the shared connectome. The disease effect is not spatially uniform; instead it is concentrated over subsets of regions, motivating graph-based multiscale analysis.
+Figure~\ref{fig:mean_signal_graphs} visualizes the mean GBM signal, mean healthy signal, and the cohort-level difference over the shared connectome. The disease effect is not spatially uniform; instead it is concentrated over subsets of regions, motivating graph-based multiscale analysis~\cite{hammond2011wavelets}.
 
 \begin{figure}[H]
     \centering
@@ -282,15 +302,12 @@ Figure~\ref{fig:gbm_mean_presence} shows the average tumor presence over the sha
     \label{fig:gbm_mean_presence}
 \end{figure}
 
-% -----------------------------------------------------------------------------
-%     Section 4: Spectral Graph Analysis
-% -----------------------------------------------------------------------------
-\section{Spectral Graph Analysis of Brain Signals}
+\subsection{Spectral Graph Analysis of Brain Signals}
 \label{sec:spectral}
 
-\subsection{Graph Fourier Transform}
+\subsubsection{Graph Fourier Transform}
 
-The graph Laplacian $L$ is real symmetric and admits the eigendecomposition
+The graph Laplacian $L$ is real symmetric and admits the eigendecomposition~\cite{chung1997spectral,shuman2013emerging}
 \begin{equation}
 \label{eq:laplacian_eigendecomp}
 L = U \Lambda U^\top,
@@ -300,8 +317,7 @@ where
 U = [u_1,\dots,u_N], \qquad
 \Lambda = \mathrm{diag}(\lambda_1,\dots,\lambda_N),
 \]
-with $0=\lambda_1 \le \lambda_2 \le \cdots \le \lambda_N$.
-The graph Fourier transform (GFT) of a signal $x\in\mathbb{R}^N$ is defined by
+with $0=\lambda_1 \le \lambda_2 \le \cdots \le \lambda_N$. The second-smallest eigenvalue $\lambda_2$ is the algebraic connectivity of the graph~\cite{fiedler1973algebraic}, and the eigenvectors $u_k$ generalize the classical Fourier harmonics to the irregular graph domain~\cite{belkin2003laplacian}. The graph Fourier transform (GFT) of a signal $x\in\mathbb{R}^N$ is defined by~\cite{shuman2013emerging,sandryhaila2013discrete}
 \begin{equation}
 \hat x = U^\top x,
 \end{equation}
@@ -311,9 +327,9 @@ x = U \hat x = \sum_{k=1}^{N} \hat x_k u_k.
 \end{equation}
 Low graph frequencies correspond to Laplacian eigenvectors with small eigenvalues and vary slowly over strongly connected regions, whereas high graph frequencies oscillate more sharply across neighboring nodes.
 
-\subsection{Dirichlet Energy and Spectral Smoothness}
+\subsubsection{Dirichlet Energy and Spectral Smoothness}
 
-A central quantity is the graph Dirichlet energy:
+A central quantity is the graph Dirichlet energy~\cite{shuman2013emerging,zhou2004learning}:
 \begin{equation}
 \label{eq:dirichlet_energy}
 \mathcal{E}(x)
@@ -337,11 +353,11 @@ x^\top U\Lambda U^\top x
 =
 \sum_{k=1}^{N} \lambda_k |\hat x_k|^2.
 \end{equation}
-Thus a signal is smooth if most of its spectral mass lies at low eigenvalues.
+Thus a signal is smooth if most of its spectral mass lies at low eigenvalues~\cite{belkin2003laplacian}.
 
-\subsection{Spectral Biomarkers}
+\subsubsection{Spectral Biomarkers}
 
-Several scalar spectral descriptors summarize graph signals compactly.
+Several scalar spectral descriptors summarize graph signals compactly, in the spirit of GSP-based analysis of brain imaging~\cite{huang2018graph}.
 
 \paragraph{Spectral centroid.}
 The spectral centroid quantifies where the signal is centered in graph frequency:
@@ -370,25 +386,7 @@ Let $\mathcal{K}_{\mathrm{low}}$ and $\mathcal{K}_{\mathrm{high}}$ denote index 
 E_{\mathrm{low}}(x)=\sum_{k\in\mathcal{K}_{\mathrm{low}}} |\hat x_k|^2, \qquad
 E_{\mathrm{high}}(x)=\sum_{k\in\mathcal{K}_{\mathrm{high}}} |\hat x_k|^2.
 \end{equation}
-Larger $E_{\mathrm{high}}$ indicates sharper spatial variation and reduced smoothness.
-
-Figure~\ref{fig:cancer_vs_normal_spectra} compares the mean spectra of the GBM and healthy cohorts. The healthy cohort shows stronger content across a broader range of graph frequencies, while the GBM cohort exhibits a different distribution of spectral power, especially in lower-to-mid frequencies.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.78\textwidth]{chapter4_assets/cancervsnormal-spectra.png}
-    \caption{Mean graph spectra for GBM and healthy cohorts. The spectra are plotted as spectral power versus graph frequency (Laplacian eigenvalue), highlighting disease-related redistribution of energy across graph harmonics.}
-    \label{fig:cancer_vs_normal_spectra}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{chapter4_assets/spectral_metrics.png}
-    \caption{Mean spectral metrics by cohort: low-frequency energy, high-frequency energy, spectral centroid, and spectral entropy. These compact descriptors summarize the organization of graph signal energy across the spectrum.}
-    \label{fig:mean_spectral_metrics}
-\end{figure}
-
-The distributional comparisons in Figure~\ref{fig:mean_spectral_metrics} confirm that the healthy cohort tends to exhibit larger high-frequency energy, larger centroid, and larger entropy than the GBM tumor signal. Table~\ref{tab:spectral_metrics_interpretation} summarizes the interpretation of these spectral biomarkers.
+Larger $E_{\mathrm{high}}$ indicates sharper spatial variation and reduced smoothness. The interpretation of these spectral biomarkers is summarized in Table~\ref{tab:spectral_metrics_interpretation}; results are reported in Section~\ref{sec:results}.
 
 \begin{table}[H]
     \centering
@@ -417,17 +415,14 @@ The distributional comparisons in Figure~\ref{fig:mean_spectral_metrics} confirm
     \end{tabular}
 \end{table}
 
-% -----------------------------------------------------------------------------
-%     Section 5: Graph Wavelet Analysis
-% -----------------------------------------------------------------------------
-\section{Graph Wavelet Analysis}
+\subsection{Graph Wavelet Analysis}
 \label{sec:wavelets}
 
-Spectral descriptors summarize overall distribution of graph frequency content but do not explicitly preserve localization in both vertex and scale domains. Graph wavelets address this by defining multiscale filters on the Laplacian spectrum.
+Spectral descriptors summarize the overall distribution of graph frequency content but do not explicitly preserve localization in both vertex and scale domains. Spectral graph wavelets address this by defining multiscale filters on the Laplacian spectrum~\cite{hammond2011wavelets}.
 
-\subsection{Spectral Graph Wavelets}
+\subsubsection{Spectral Graph Wavelets}
 
-Let $g(\cdot)$ be a spectral kernel. A graph wavelet operator at scale $\tau>0$ is
+Let $g(\cdot)$ be a spectral kernel. A graph wavelet operator at scale $\tau>0$ is~\cite{hammond2011wavelets}
 \begin{equation}
 T_{g}^{(\tau)} = g(\tau L) = U\,g(\tau \Lambda)\,U^\top,
 \end{equation}
@@ -436,34 +431,20 @@ Applying this operator to a graph signal $x$ gives the scale-dependent wavelet c
 \begin{equation}
 w^{(\tau)} = T_{g}^{(\tau)}x.
 \end{equation}
-For heat-kernel-style diffusion wavelets one may use $g(\tau\lambda)=e^{-\tau\lambda}$, where small $\tau$ emphasizes finer detail and large $\tau$ emphasizes coarser smoothing. The scale-dependent wavelet energy
+For heat-kernel-style diffusion wavelets one may use $g(\tau\lambda)=e^{-\tau\lambda}$, connecting the wavelet construction to diffusion geometry~\cite{coifman2006diffusion}; small $\tau$ emphasizes finer detail and large $\tau$ emphasizes coarser smoothing. The scale-dependent wavelet energy
 \begin{equation}
 E_{\mathrm{wav}}(\tau;x) = \|w^{(\tau)}\|_2^2
 =
 \sum_{k=1}^{N} |g(\tau\lambda_k)|^2 |\hat x_k|^2
 \end{equation}
-provides a useful bridge between descriptive multiscale analysis and graph-regularized learning.
+provides a useful bridge between descriptive multiscale analysis and graph-regularized learning. Multiscale disease separation is reported in Section~\ref{sec:results} (Figure~\ref{fig:wavelet_boxplots}).
 
-\subsection{Multiscale Disease Separation}
-
-Figure~\ref{fig:wavelet_boxplots} shows multiscale graph wavelet energy at $\tau=1,5,10,20$. Healthy T1 signals exhibit markedly larger wavelet energy at smaller and intermediate scales, while the GBM tumor signal remains comparatively small and compressed. Wavelet energy is especially informative because signals with high fine-scale wavelet energy necessarily retain more localized irregularity on the graph, which is closely related to larger Dirichlet energy and therefore to a larger smoothness penalty in the learning objective.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{chapter4_assets/wavelet-box-whisker.png}
-    \caption{Multiscale graph wavelet energy across cohorts at scales $\tau=1,5,10,20$. The strongest group differences occur at smaller scales, where healthy T1 signals display substantially larger wavelet energy than GBM tumor signals.}
-    \label{fig:wavelet_boxplots}
-\end{figure}
-
-% -----------------------------------------------------------------------------
-%     Section 6: Diffusion Dynamics and Smoothness
-% -----------------------------------------------------------------------------
-\section{Diffusion Dynamics and Dirichlet Smoothness}
+\subsection{Diffusion Dynamics and Dirichlet Smoothness}
 \label{sec:diffusion}
 
-\subsection{Heat Diffusion Model}
+\subsubsection{Heat Diffusion Model}
 
-A standard physical interpretation of graph smoothness is diffusion. Let $f(t)\in\mathbb{R}^N$ be a time-dependent graph signal satisfying
+A standard physical interpretation of graph smoothness is diffusion~\cite{coifman2006diffusion}. Let $f(t)\in\mathbb{R}^N$ be a time-dependent graph signal satisfying
 \begin{equation}
 \frac{d f(t)}{dt} = -L f(t), \qquad f(0)=f_0.
 \end{equation}
@@ -482,31 +463,28 @@ Because each spectral component decays as $e^{-t\lambda_k}$, high-frequency comp
 \end{equation}
 so Dirichlet energy measures the instantaneous rate at which signal energy is dissipated by diffusion. Signals with large Dirichlet energy contain sharp edge-wise discrepancies and smooth quickly; signals with small Dirichlet energy are already smooth and diffuse slowly.
 
-\subsection{Interpretation for Brain Signals}
+\subsubsection{Interpretation for Brain Signals}
 
-The smoothness assumption does \emph{not} mean that disease effects are spatially uniform. Rather, it imposes that the \emph{learned predictive representation} should avoid gratuitous node-to-node oscillation not supported by the graph structure. The objective is not to maximize smoothness at all costs but to minimize
+The smoothness assumption does \emph{not} mean that disease effects are spatially uniform. Rather, it imposes that the \emph{learned predictive representation} should avoid gratuitous node-to-node oscillation not supported by the graph structure, in line with manifold- and graph-regularized learning~\cite{belkin2003laplacian,zhou2004learning}. The objective is not to maximize smoothness at all costs but to minimize
 \[
 \mathcal{L}_{\text{pred}} + \lambda \mathcal{L}_{\text{smooth}},
 \]
 so that the retained variation is the variation needed for discrimination.
 
-% -----------------------------------------------------------------------------
-%     Section 7: Geometric Deep Learning
-% -----------------------------------------------------------------------------
-\section{Geometric Deep Learning for Connectome Prediction}
+\subsection{Geometric Deep Learning for Connectome Prediction}
 \label{sec:gdl}
 
-\subsection{Model Overview}
+\subsubsection{Model Overview}
 
-Given a graph $G=(V,E,W)$ and subject signal $x^{(s)}$, the goal is to predict whether the subject belongs to the GBM or healthy cohort. A graph neural network (GNN) maps node features to a graph-level representation and then to a class probability:
+Given a graph $G=(V,E,W)$ and subject signal $x^{(s)}$, the goal is to predict whether the subject belongs to the GBM or healthy cohort. Following the geometric deep learning paradigm~\cite{bronstein2017geometric,wu2021comprehensive}, a graph neural network (GNN) maps node features to a graph-level representation and then to a class probability:
 \begin{equation}
 \hat y^{(s)} = \sigma\!\big(\phi_{\mathrm{readout}}(H^{(L,s)})\big),
 \end{equation}
 where $H^{(L,s)}\in\mathbb{R}^{N\times F_L}$ is the node embedding matrix after $L$ layers, $\phi_{\mathrm{readout}}$ is a graph-level pooling function, and $\sigma$ is the logistic sigmoid.
 
-\subsection{Message Passing and Graph Convolution}
+\subsubsection{Message Passing and Graph Convolution}
 
-A standard message passing layer is
+A standard message passing layer is~\cite{gilmer2017neural}
 \begin{equation}
 h_i^{(\ell+1)}
 =
@@ -518,7 +496,7 @@ h_i^{(\ell)},
 \phi^{(\ell)}(h_i^{(\ell)},h_j^{(\ell)},e_{ij})
 \right),
 \end{equation}
-where $\oplus$ is a permutation-invariant aggregation. For a graph convolution using the normalized adjacency,
+where $\oplus$ is a permutation-invariant aggregation. For a graph convolution using the normalized adjacency~\cite{kipf2017semi},
 \begin{equation}
 \label{eq:gcn_layer}
 H^{(\ell+1)}
@@ -528,9 +506,9 @@ H^{(\ell+1)}
 H^{(\ell)} \Theta^{(\ell)}
 \right),
 \end{equation}
-where $\widetilde W = W + I$, $\widetilde D$ is its degree matrix, $\Theta^{(\ell)}$ are learnable weights, and $\rho$ is a pointwise nonlinearity. Equation~\eqref{eq:gcn_layer} shows explicitly how the graph topology constrains feature mixing across neighboring regions.
+where $\widetilde W = W + I$, $\widetilde D$ is its degree matrix, $\Theta^{(\ell)}$ are learnable weights, and $\rho$ is a pointwise nonlinearity. Equation~\eqref{eq:gcn_layer} is a first-order localized spectral filter~\cite{defferrard2016convolutional} and shows explicitly how the graph topology constrains feature mixing across neighboring regions.
 
-\subsection{Graph-Level Readout}
+\subsubsection{Graph-Level Readout}
 
 The graph-level embedding is formed by global mean pooling,
 \begin{equation}
@@ -541,7 +519,7 @@ and the predicted probability is
 \hat p^{(s)} = \sigma(w^\top z^{(s)} + b) = \frac{1}{1+e^{-\eta^{(s)}}}.
 \end{equation}
 
-\subsection{Training Objective}
+\subsubsection{Training Objective}
 
 The task-specific prediction loss is binary cross-entropy:
 \begin{equation}
@@ -553,7 +531,7 @@ The task-specific prediction loss is binary cross-entropy:
 y^{(s)}\log \hat p^{(s)} + \big(1-y^{(s)}\big)\log\big(1-\hat p^{(s)}\big)
 \right].
 \end{equation}
-The smoothness penalty uses a matrix-valued generalization of graph Dirichlet energy over learned embeddings $H^{(L,s)}$:
+The smoothness penalty uses a matrix-valued generalization of graph Dirichlet energy over learned embeddings $H^{(L,s)}$, extending scalar Laplacian regularization~\cite{zhou2004learning,belkin2003laplacian} to vector-valued node features:
 \begin{equation}
 \label{eq:smoothness_loss}
 \mathcal{L}_{\mathrm{smooth}}
@@ -571,7 +549,7 @@ Thus neighboring nodes with strong graph affinity are encouraged to have similar
 =
 2L H^{(L,s)},
 \end{equation}
-so the smoothness gradient acts as a graph diffusion operator on learned node embeddings.
+so the smoothness gradient acts as a graph diffusion operator on learned node embeddings, mirroring the heat-diffusion dynamics of Equation~\eqref{eq:heat_solution}.
 
 Table~\ref{tab:training_objective_summary} summarizes the components of the training objective.
 
@@ -602,12 +580,46 @@ Table~\ref{tab:training_objective_summary} summarizes the components of the trai
 \end{table}
 
 % -----------------------------------------------------------------------------
-%     Section 8: Results and Discussion
+%     Section 3: Results
 % -----------------------------------------------------------------------------
-\section{Results and Discussion}
+\section{Results}
 \label{sec:results}
 
-\subsection{Geometric Deep Learning Results}
+\subsection{Spectral Biomarkers of Disease}
+\label{sec:results_spectral}
+
+Applying the graph Fourier transform to the cohort mean signals reveals a systematic redistribution of spectral energy between healthy and disease groups. Figure~\ref{fig:cancer_vs_normal_spectra} compares the mean spectra of the GBM and healthy cohorts. The healthy cohort shows stronger content across a broader range of graph frequencies, while the GBM cohort exhibits a different distribution of spectral power, especially in lower-to-mid frequencies---consistent with the diffusely infiltrative, spatially heterogeneous character of the disease~\cite{louis2021who}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{chapter4_assets/cancervsnormal-spectra.png}
+    \caption{Mean graph spectra for GBM and healthy cohorts. The spectra are plotted as spectral power versus graph frequency (Laplacian eigenvalue), highlighting disease-related redistribution of energy across graph harmonics.}
+    \label{fig:cancer_vs_normal_spectra}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/spectral_metrics.png}
+    \caption{Mean spectral metrics by cohort: low-frequency energy, high-frequency energy, spectral centroid, and spectral entropy. These compact descriptors summarize the organization of graph signal energy across the spectrum.}
+    \label{fig:mean_spectral_metrics}
+\end{figure}
+
+The distributional comparisons in Figure~\ref{fig:mean_spectral_metrics} confirm that the healthy cohort tends to exhibit larger high-frequency energy, larger spectral centroid, and larger spectral entropy than the GBM tumor signal. In the language of Table~\ref{tab:spectral_metrics_interpretation}, GBM signals are comparatively concentrated in smooth, low-frequency graph harmonics, whereas healthy T1 signals retain more distributed, higher-frequency structure.
+
+\subsection{Multiscale Wavelet Separation}
+\label{sec:results_wavelets}
+
+Figure~\ref{fig:wavelet_boxplots} shows multiscale graph wavelet energy at $\tau=1,5,10,20$. Healthy T1 signals exhibit markedly larger wavelet energy at smaller and intermediate scales, while the GBM tumor signal remains comparatively small and compressed. Wavelet energy is especially informative because signals with high fine-scale wavelet energy necessarily retain more localized irregularity on the graph, which is closely related to larger Dirichlet energy and therefore to a larger smoothness penalty in the learning objective~\cite{hammond2011wavelets}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{chapter4_assets/wavelet-box-whisker.png}
+    \caption{Multiscale graph wavelet energy across cohorts at scales $\tau=1,5,10,20$. The strongest group differences occur at smaller scales, where healthy T1 signals display substantially larger wavelet energy than GBM tumor signals.}
+    \label{fig:wavelet_boxplots}
+\end{figure}
+
+\subsection{Geometric Deep Learning Classification}
+\label{sec:results_gdl}
 
 The geometric deep learning workflow and training curves are shown in Figure~\ref{fig:geometric_deep_learning}. The training curves reveal three important patterns:
 \begin{enumerate}[label=(\alph*)]
@@ -623,7 +635,7 @@ The geometric deep learning workflow and training curves are shown in Figure~\re
     \label{fig:geometric_deep_learning}
 \end{figure}
 
-The third pattern is particularly informative: to improve discrimination, the model learns embeddings that are less smooth than at initialization. This is not contradictory---the objective minimizes the \emph{sum} of task loss and smoothness penalty, so the optimum may legitimately move toward a higher smoothness term when that increase is more than compensated by a larger reduction in $\mathcal{L}_{\mathrm{pred}}$. The regularizer does not prohibit task-relevant graph variation; it discourages gratuitous variation.
+The third pattern is particularly informative: to improve discrimination, the model learns embeddings that are less smooth than at initialization. This is not contradictory---the objective minimizes the \emph{sum} of task loss and smoothness penalty, so the optimum may legitimately move toward a higher smoothness term when that increase is more than compensated by a larger reduction in $\mathcal{L}_{\mathrm{pred}}$. The regularizer does not prohibit task-relevant graph variation; it discourages gratuitous variation, in keeping with the graph-regularization principle~\cite{zhou2004learning}.
 
 The test confusion matrix shows $6/6$ healthy and $3/3$ GBM examples correctly classified on the reported split. The PCA projection of learned subject embeddings (Figure~\ref{fig:pca_projection}) further demonstrates clear class separation.
 
@@ -634,7 +646,13 @@ The test confusion matrix shows $6/6$ healthy and $3/3$ GBM examples correctly c
     \label{fig:pca_projection}
 \end{figure}
 
-\subsection{Spectral Biomarker Summary}
+% -----------------------------------------------------------------------------
+%     Section 4: Discussion
+% -----------------------------------------------------------------------------
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Principal Findings}
 
 The descriptive analyses confirm that disease and healthy cohorts differ in how signal energy is distributed over graph frequencies and graph scales. The key findings are:
 \begin{itemize}
@@ -643,18 +661,20 @@ The descriptive analyses confirm that disease and healthy cohorts differ in how 
     \item multiscale wavelet energy is largest in healthy signals, especially at smaller scales;
     \item disease effects are localized over specific atlas nodes and subnetworks rather than uniformly distributed.
 \end{itemize}
+These observations justify using graph-structured regularization in a classifier: the graph carries biologically meaningful spatial organization~\cite{bullmore2009complex,bassett2017network}, and the spectrum provides an interpretable basis for quantifying disease-related departures from typical organization~\cite{huang2018graph,medaglia2018functional}.
 
-These observations justify using graph-structured regularization in a classifier: the graph carries biologically meaningful spatial organization, and the spectrum provides an interpretable basis for quantifying disease-related departures from typical organization.
+\subsection{Relation to Prior Work}
 
-\subsection{Stability and Robustness}
+Our framework connects two literatures that are often pursued separately. On the one hand, GSP has been used to analyze functional and structural brain imaging, treating cortical activity as a signal that is more or less aligned with the anatomical graph~\cite{huang2018graph,medaglia2018functional}; on the other, geometric deep learning has produced powerful graph classifiers~\cite{bronstein2017geometric,kipf2017semi,defferrard2016convolutional,gilmer2017neural,wu2021comprehensive}. The contribution here is to use the \emph{same} spectral object---graph Dirichlet energy---both as a descriptive biomarker (via the GFT and spectral graph wavelets~\cite{shuman2013emerging,hammond2011wavelets}) and as a training-time regularizer that is mathematically equivalent to Laplacian-based semi-supervised smoothing~\cite{zhou2004learning,belkin2003laplacian} and to heat diffusion on the graph~\cite{coifman2006diffusion}. This unification makes the model's inductive bias explicit and interpretable, in contrast to purely black-box classifiers.
+
+\subsection{Stability, Robustness, and Denoising}
 
 The methodology combines a fixed shared graph with subject-varying signals, offering several stability advantages:
 \begin{enumerate}[label=(\arabic*)]
-    \item \textbf{Common node semantics:} every node corresponds to the same atlas region across subjects;
-    \item \textbf{Shared spectral basis:} the eigenvectors of the common graph provide a single reference frame for all GFT analyses;
-    \item \textbf{Regularized learning:} the Dirichlet penalty reduces the risk of overfitting to noisy subject-specific node fluctuations.
+    \item \textbf{Common node semantics:} every node corresponds to the same atlas region across subjects, because both cohorts are registered to the MNI152 template and parcellated with the Harvard--Oxford atlas~\cite{fonov2011unbiased,makris2006decreased};
+    \item \textbf{Shared spectral basis:} the eigenvectors of the common graph provide a single reference frame for all GFT analyses~\cite{chung1997spectral};
+    \item \textbf{Regularized learning:} the Dirichlet penalty reduces the risk of overfitting to noisy subject-specific node fluctuations~\cite{belkin2003laplacian}.
 \end{enumerate}
-
 If the observed signal is $x = x^\star + \varepsilon$ where $\varepsilon$ is noise, then
 \begin{equation}
 \mathcal{E}(x)
@@ -665,17 +685,21 @@ If the observed signal is $x = x^\star + \varepsilon$ where $\varepsilon$ is noi
 +
 \mathcal{E}(\varepsilon),
 \end{equation}
-and noise concentrated at high graph frequencies inflates the Dirichlet energy because $\mathcal{E}(\varepsilon)=\sum_{k}\lambda_k |\hat\varepsilon_k|^2$. Thus the smoothness penalty preferentially suppresses high-frequency noise, giving it a denoising interpretation in addition to its role as a structural prior.
+and noise concentrated at high graph frequencies inflates the Dirichlet energy because $\mathcal{E}(\varepsilon)=\sum_{k}\lambda_k |\hat\varepsilon_k|^2$. Thus the smoothness penalty preferentially suppresses high-frequency noise, giving it a denoising interpretation in addition to its role as a structural prior~\cite{shuman2013emerging}.
+
+\subsection{Limitations and Future Work}
+
+The perfect separation reported on the held-out split (Figure~\ref{fig:geometric_deep_learning}) should be interpreted in light of the modest cohort size; the result demonstrates the feasibility and interpretability of the framework rather than a validated clinical biomarker. Several extensions are natural. First, the shared graph could be replaced by subject-specific structural or functional connectomes~\cite{sporns2005human,rubinov2010complex}, at the cost of losing a single shared spectral basis. Second, the classifier could exploit the full multi-parametric MRI available in UPENN-GBM (post-contrast T1, T2, FLAIR) and the graded segmentation labels~\cite{bakas2022university,menze2015multimodal}, rather than binary tumor masks and T1 alone. Third, larger and multi-institutional cohorts---for example combining UPENN-GBM with TCGA glioma collections~\cite{bakas2017advancing}---would enable rigorous cross-site validation. Finally, richer spectral filters, such as higher-order Chebyshev polynomial approximations~\cite{defferrard2016convolutional}, could sharpen both the descriptive biomarkers and the learned representations.
 
 % -----------------------------------------------------------------------------
-%     Section 9: Conclusion
+%     Section 5: Conclusion
 % -----------------------------------------------------------------------------
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper establishes a full graph signal processing pipeline for atlas-based brain connectome analysis of glioblastoma multiforme. The main contributions are:
+This paper establishes a full graph signal processing pipeline for atlas-based brain connectome analysis of glioblastoma multiforme, grounded in public, reproducible imaging resources~\cite{ixi_dataset,bakas2022university,upenngbm_tcia}. The main contributions are:
 \begin{enumerate}[label=(\arabic*)]
-    \item a shared 48-node Harvard--Oxford atlas graph representation for all subjects,
+    \item a shared 48-node Harvard--Oxford atlas graph representation registered to MNI152 space for both healthy and disease cohorts,
     \item graph signal definitions for T1 intensity and tumor burden,
     \item spectral biomarkers including high-frequency energy, spectral centroid, and spectral entropy,
     \item multiscale graph wavelet analysis of disease-related signals,
@@ -683,7 +707,7 @@ This paper establishes a full graph signal processing pipeline for atlas-based b
     \item a geometric deep learning classifier trained under a smoothness-regularized objective.
 \end{enumerate}
 
-The central conclusion is that connectome-aware analysis is valuable both descriptively and predictively. Descriptively, the graph Fourier basis and graph wavelets reveal where disease-related information is located across graph frequencies and scales. Predictively, the same graph supports the smoothness-regularized learning objective:
+The central conclusion is that connectome-aware analysis is valuable both descriptively and predictively. Descriptively, the graph Fourier basis and graph wavelets reveal where disease-related information is located across graph frequencies and scales~\cite{shuman2013emerging,hammond2011wavelets,huang2018graph}. Predictively, the same graph supports the smoothness-regularized learning objective:
 \[
 \mathcal{L}_{\mathrm{total}}
 =
@@ -691,7 +715,15 @@ The central conclusion is that connectome-aware analysis is valuable both descri
 +
 \lambda \mathcal{L}_{\mathrm{smooth}},
 \]
-which is principled because it reflects the assumption that neighboring brain regions should generally have related latent representations, except where the classification task benefits from preserving edge-wise contrast. The results support the view that disease-related brain patterns are best understood as graph signals over a biologically meaningful network, and that the combination of spectral analysis, graph wavelets, and smoothness-regularized geometric learning provides a coherent framework for both mechanistic interpretation and accurate prediction.
+which is principled because it reflects the assumption that neighboring brain regions should generally have related latent representations, except where the classification task benefits from preserving edge-wise contrast~\cite{zhou2004learning,belkin2003laplacian}. The results support the view that disease-related brain patterns are best understood as graph signals over a biologically meaningful network~\cite{bullmore2009complex,bassett2017network}, and that the combination of spectral analysis, graph wavelets, and smoothness-regularized geometric learning~\cite{bronstein2017geometric} provides a coherent framework for both mechanistic interpretation and accurate prediction.
+
+% -----------------------------------------------------------------------------
+%     Acknowledgements
+% -----------------------------------------------------------------------------
+\section*{Acknowledgements}
+\addcontentsline{toc}{section}{Acknowledgements}
+
+The authors gratefully acknowledge the Biomedical Image Analysis Group at Imperial College London for providing the IXI dataset of healthy-subject MRI~\cite{ixi_dataset}, and the University of Pennsylvania and The Cancer Imaging Archive for curating and distributing the UPENN-GBM cohort~\cite{bakas2022university,upenngbm_tcia,clark2013cancer}. We thank the developers of the MNI152 template~\cite{fonov2011unbiased}, the Harvard--Oxford atlas~\cite{makris2006decreased}, and the open-source neuroimaging toolkits FSL~\cite{jenkinson2012fsl} and ANTs~\cite{avants2011reproducible}, whose availability made this reproducible study possible. The authors declare no competing interests.
 
 \FloatBarrier
 
